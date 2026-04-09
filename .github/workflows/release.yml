@@ -79,13 +79,11 @@ jobs:
       matrix:
         target:
           - base
-          - sdxl
-          - sd3
-          - flux1-schnell
-          - flux1-dev
-          - flux1-dev-fp8
-          - z-image-turbo
           - base-cuda12-8-1
+          - base-cuda13-0
+          - ltx2-3-distilled
+          - ltx2-3-distilled-fp8
+          - ltx2-3-distilled-cuda13
 
     steps:
       - name: Checkout
