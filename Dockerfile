@@ -11,6 +11,11 @@ ARG ENABLE_PYTORCH_UPGRADE=false
 ARG PYTORCH_INDEX_URL
 ARG PYTORCH_PACKAGES="torch torchvision torchaudio"
 ARG EXTRA_PYTHON_PACKAGES=""
+ARG EXTRA_PYTHON_INDEX_URL=""
+ARG INSTALL_LTX_VIDEO_NODES=false
+ARG LTX_VIDEO_REF=master
+ARG LTX23_PRELOAD_VARIANT=""
+ARG LTX23_PRELOAD_UPSCALERS=false
 
 # Prevents prompts from packages asking for user input during installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -78,13 +83,18 @@ RUN uv pip install runpod requests websocket-client
 
 # Optional image-level extras for specific GPU/model stacks.
 RUN if [ -n "${EXTRA_PYTHON_PACKAGES}" ]; then \
-      uv pip install ${EXTRA_PYTHON_PACKAGES}; \
+      if [ -n "${EXTRA_PYTHON_INDEX_URL}" ]; then \
+        uv pip install --index-url ${EXTRA_PYTHON_INDEX_URL} ${EXTRA_PYTHON_PACKAGES}; \
+      else \
+        uv pip install ${EXTRA_PYTHON_PACKAGES}; \
+      fi; \
     fi
 
 # Add application code and scripts
-ADD src/start.sh src/bootstrap_workspace.sh src/network_volume.py handler.py test_input.json ./
+ADD src/start.sh src/bootstrap_workspace.sh src/bootstrap_ltx23.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
 RUN chmod +x /bootstrap_workspace.sh
+RUN chmod +x /bootstrap_ltx23.sh
 
 # Add script to install custom nodes
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
@@ -96,6 +106,15 @@ ENV PIP_NO_INPUT=1
 # Copy helper script to switch Manager network mode at container start
 COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x /usr/local/bin/comfy-manager-set-mode
+
+# Install the official LTX ComfyUI nodes when requested by the image target.
+RUN if [ "${INSTALL_LTX_VIDEO_NODES}" = "true" ]; then \
+      git clone --depth=1 --branch "${LTX_VIDEO_REF}" https://github.com/Lightricks/ComfyUI-LTXVideo.git /comfyui/custom_nodes/ComfyUI-LTXVideo && \
+      uv pip install -r /comfyui/custom_nodes/ComfyUI-LTXVideo/requirements.txt; \
+    fi
+
+ENV LTX23_PRELOAD_VARIANT="${LTX23_PRELOAD_VARIANT}"
+ENV LTX23_PRELOAD_UPSCALERS="${LTX23_PRELOAD_UPSCALERS}"
 
 # Set the default command to run when starting the container
 CMD ["/start.sh"]

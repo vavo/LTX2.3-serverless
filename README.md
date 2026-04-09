@@ -1,6 +1,6 @@
-# worker-comfyui
+# LTX2.3 Serverless Worker
 
-> [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a serverless API on [RunPod](https://www.runpod.io/)
+> [ComfyUI](https://github.com/comfyanonymous/ComfyUI) + [LTX 2.3](https://huggingface.co/Lightricks/LTX-2.3) as a serverless video inference worker on [RunPod](https://www.runpod.io/)
 
 <p align="center">
   <img src="assets/worker_sitting_in_comfy_chair.jpg" title="Worker sitting in comfy chair" />
@@ -10,7 +10,7 @@
 
 ---
 
-This project allows you to run ComfyUI workflows as a serverless API endpoint on the RunPod platform. Submit workflows via API calls and receive generated images as base64 strings or S3 URLs.
+This project is a RunPod serverless template for LTX 2.3 video inference on top of the generic ComfyUI worker pattern. It is tuned for persistent `/workspace` state so ComfyUI, the Python venv, caches, custom nodes, and downloaded model assets can survive worker churn instead of being re-fetched every time RunPod decides to rediscover entropy.
 
 ## Table of Contents
 
@@ -25,23 +25,36 @@ This project allows you to run ComfyUI workflows as a serverless API endpoint on
 
 ## Quickstart
 
-1.  🐳 Choose one of the [available Docker images](#available-docker-images) for your serverless endpoint (e.g., `runpod/worker-comfyui:<version>-sd3`).
-2.  📄 Follow the [Deployment Guide](docs/deployment.md) to set up your RunPod template and endpoint.
-3.  ⚙️ Optionally configure the worker (e.g., for S3 upload) using environment variables - see the full [Configuration Guide](docs/configuration.md).
-4.  🧪 Pick an example workflow from [`test_resources/workflows/`](./test_resources/workflows/) or [get your own](#getting-the-workflow-json).
-5.  🚀 Follow the [Usage](#usage) steps below to interact with your deployed endpoint.
+1.  Build or use one of the LTX-oriented image targets from [docker-bake.hcl](./docker-bake.hcl), preferably `ltx2-3-distilled` for CUDA 12.8 or `ltx2-3-distilled-cuda13` if you are specifically targeting newer Blackwell-friendly hosts.
+2.  Attach a RunPod network volume so `/workspace` is persistent across worker boots.
+3.  Deploy the image as a serverless endpoint and keep active workers at `0` unless you enjoy paying for idle silicon.
+4.  Export an LTX workflow from ComfyUI using `Workflow > Export (API)`.
+5.  Send the workflow to `/run` or `/runsync` as described below.
 
 ## Available Docker Images
 
-These images are available on Docker Hub under `runpod/worker-comfyui`:
+Key image targets in this repository:
 
-- **`runpod/worker-comfyui:<version>-base`**: Clean ComfyUI install with no models.
-- **`runpod/worker-comfyui:<version>-flux1-schnell`**: Includes checkpoint, text encoders, and VAE for [FLUX.1 schnell](https://huggingface.co/black-forest-labs/FLUX.1-schnell).
-- **`runpod/worker-comfyui:<version>-flux1-dev`**: Includes checkpoint, text encoders, and VAE for [FLUX.1 dev](https://huggingface.co/black-forest-labs/FLUX.1-dev).
-- **`runpod/worker-comfyui:<version>-sdxl`**: Includes checkpoint and VAEs for [Stable Diffusion XL](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0).
-- **`runpod/worker-comfyui:<version>-sd3`**: Includes checkpoint for [Stable Diffusion 3 medium](https://huggingface.co/stabilityai/stable-diffusion-3-medium).
+- **`<repo>:<version>-ltx2.3-distilled-cu128`**: CUDA 12.8 base, latest ComfyUI, official `ComfyUI-LTXVideo` nodes, LTX 2.3 distilled checkpoint preloaded into persistent storage on first boot.
+- **`<repo>:<version>-ltx2.3-distilled-fp8-cu128`**: Same as above, but with the FP8 distilled checkpoint for lower VRAM pressure.
+- **`<repo>:<version>-ltx2.3-distilled-cu130`**: Experimental CUDA 13 image for newer Blackwell-oriented stacks. This uses PyTorch's `cu130` wheels, which currently start at 2.9 rather than 2.8.
+- **`<repo>:<version>-base-cuda12.8.1`**: Clean CUDA 12.8 ComfyUI base for custom LTX or non-LTX builds.
+- **`<repo>:<version>-base-cuda13.0`**: Clean CUDA 13 base for newer Nvidia hosts where you want to bring your own workflow, nodes, and model strategy.
 
-Replace `<version>` with the current release tag, check the [releases page](https://github.com/runpod-workers/worker-comfyui/releases) for the latest version.
+The repository still carries the generic image targets from upstream, but the useful ones for this template are the LTX 2.3 and modern CUDA variants.
+
+## LTX Notes
+
+- Official LTX guidance for ComfyUI is to install `ComfyUI-LTXVideo` and let the nodes auto-download required assets on first use.
+- This worker can also preload the main LTX 2.3 checkpoint at boot via `LTX23_PRELOAD_VARIANT`, with files landing under the persistent model root on `/workspace`.
+- The current default LTX preload choices are `distilled`, `dev`, `distilled-fp8`, and `dev-fp8`.
+- A network volume is effectively mandatory here unless you want every cold worker to rediscover the same multi-GB files like it has short-term memory loss.
+
+## GPU Baseline
+
+- CUDA 12.8 is the default target for this repo.
+- CUDA 13 is provided as an experimental track for Blackwell-era deployments.
+- LTX's own ComfyUI documentation recommends a CUDA-capable GPU with 32GB+ VRAM and 100GB+ free disk for a comfortable setup.
 
 ## API Specification
 

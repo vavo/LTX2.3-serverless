@@ -1,6 +1,6 @@
 {
-  "title": "ComfyUI",
-  "description": "Generate images with ComfyUI using FLUX.1-dev (fp8)",
+  "title": "LTX 2.3 ComfyUI Worker",
+  "description": "Run LTX 2.3 video inference on ComfyUI with persistent /workspace state",
   "type": "serverless",
   "category": "image",
   "iconUrl": "https://cpjrphpz3t5wbwfe.public.blob.vercel-storage.com/comfy-ui.png",
@@ -9,8 +9,28 @@
     "containerDiskInGb": 20,
     "gpuIds": "ADA_24",
     "gpuCount": 1,
-    "allowedCudaVersions": ["12.7", "12.6"],
+    "allowedCudaVersions": ["13.0", "12.8", "12.7", "12.6"],
     "env": [
+      {
+        "key": "LTX23_PRELOAD_VARIANT",
+        "input": {
+          "name": "LTX 2.3 Checkpoint",
+          "type": "string",
+          "description": "Optional startup preload: distilled, dev, distilled-fp8, or dev-fp8",
+          "default": "distilled",
+          "advanced": false
+        }
+      },
+      {
+        "key": "PERSIST_WORKSPACE",
+        "input": {
+          "name": "Persist /workspace",
+          "type": "boolean",
+          "description": "Store ComfyUI, venv, caches, and downloaded assets on the attached network volume",
+          "default": true,
+          "advanced": false
+        }
+      },
       {
         "key": "COMFY_ORG_API_KEY",
         "input": {
