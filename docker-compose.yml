@@ -1,6 +1,6 @@
 services:
   comfyui-worker:
-    image: runpod/worker-comfyui:dev
+    image: ltx23-worker:dev
     pull_policy: never
     deploy:
       resources:

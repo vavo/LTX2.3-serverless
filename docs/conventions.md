@@ -1,12 +1,12 @@
 # Introduction
 
-This project (`worker-comfyui`) provides a way to run [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a serverless API worker on the [RunPod](https://www.runpod.io/) platform. Its main purpose is to allow users to submit ComfyUI image generation workflows via a simple API call and receive the resulting images, either directly as base64-encoded strings or via an upload to an AWS S3 bucket.
+This project provides a way to run [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a serverless API worker on the [RunPod](https://www.runpod.io/) platform, with the current repo focused on LTX 2.3 video inference rather than generic image-model packaging.
 
 It packages ComfyUI into Docker images, manages job handling via the `runpod` SDK, uses websockets for efficient communication with ComfyUI, and facilitates configuration through environment variables.
 
 # Project Conventions and Rules
 
-This document outlines the key operational and structural conventions for the `worker-comfyui` project. While there are no strict code-style rules enforced by linters currently, following these conventions ensures consistency and smooth development/deployment.
+This document outlines the key operational and structural conventions for the project. While there are no strict code-style rules enforced by linters currently, following these conventions ensures consistency and smooth development/deployment.
 
 ## 1. Configuration
 
@@ -23,7 +23,7 @@ This document outlines the key operational and structural conventions for the `w
   ```
 - **Development Builds:** For faster development iterations, use `MODEL_TYPE=base` to skip downloading external models:
   ```bash
-  docker build --build-arg MODEL_TYPE=base -t runpod/worker-comfyui:dev .
+  docker build --build-arg MODEL_TYPE=base -t ltx23-worker:dev .
   ```
 - **Customization:** Follow the methods in the `README.md` for adding custom models/nodes (Network Volume or Dockerfile edits + snapshots).
 
@@ -47,7 +47,7 @@ This document outlines the key operational and structural conventions for the `w
 - **Code Changes:** After modifying handler code, always rebuild the Docker image before testing with `docker-compose`:
   ```bash
   docker-compose down
-  docker build --build-arg MODEL_TYPE=base -t runpod/worker-comfyui:dev .
+  docker build --build-arg MODEL_TYPE=base -t ltx23-worker:dev .
   docker-compose up -d
   ```
 - **Debugging:** Use strategic logging/print statements to understand external API responses (like ComfyUI's error formats) before implementing error handling.

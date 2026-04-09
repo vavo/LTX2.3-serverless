@@ -3,7 +3,7 @@ variable "DOCKERHUB_REPO" {
 }
 
 variable "DOCKERHUB_IMG" {
-  default = "worker-comfyui"
+  default = "ltx23-worker"
 }
 
 variable "RELEASE_VERSION" {
@@ -64,7 +64,7 @@ variable "HUGGINGFACE_ACCESS_TOKEN" {
 }
 
 group "default" {
-  targets = ["base", "sdxl", "sd3", "flux1-schnell", "flux1-dev", "flux1-dev-fp8", "z-image-turbo", "base-cuda12-8-1", "ltx2-3-distilled", "ltx2-3-distilled-fp8", "base-cuda13-0", "ltx2-3-distilled-cuda13"]
+  targets = ["base", "base-cuda12-8-1", "base-cuda13-0", "ltx2-3-distilled", "ltx2-3-distilled-fp8", "ltx2-3-distilled-cuda13"]
 }
 
 target "base" {

@@ -1,6 +1,6 @@
 # Development and Local Testing
 
-This guide covers setting up your local environment for developing and testing the `worker-comfyui`.
+This guide covers setting up your local environment for developing and testing this LTX-focused ComfyUI worker.
 
 Both tests will use the data from [`test_input.json`](../test_input.json), so make your changes in there to test different workflow inputs properly.
 
@@ -16,8 +16,8 @@ Both tests will use the data from [`test_input.json`](../test_input.json), so ma
 
 1.  **Clone the repository** (if you haven't already):
     ```bash
-    git clone https://github.com/runpod-workers/worker-comfyui.git
-    cd worker-comfyui
+    git clone https://github.com/vavo/LTX2.3-serverless.git
+    cd LTX2.3-serverless
     ```
 2.  **Create a virtual environment**:
     ```bash
