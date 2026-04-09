@@ -79,7 +79,8 @@ ADD src/extra_model_paths.yaml ./
 WORKDIR /
 
 # Install Python runtime dependencies for the handler
-RUN uv pip install runpod requests websocket-client
+ADD requirements.txt ./
+RUN uv pip install -r /requirements.txt
 
 # Optional image-level extras for specific GPU/model stacks.
 RUN if [ -n "${EXTRA_PYTHON_PACKAGES}" ]; then \
