@@ -6,7 +6,7 @@
   <img src="assets/worker_sitting_in_comfy_chair.jpg" title="Worker sitting in comfy chair" />
 </p>
 
-[![RunPod](https://api.runpod.io/badge/runpod-workers/worker-comfyui)](https://www.runpod.io/console/hub/runpod-workers/worker-comfyui)
+RunPod hub metadata is included in [`.runpod/hub.json`](./.runpod/hub.json); publish the hub entry before wiring a public badge.
 
 ---
 

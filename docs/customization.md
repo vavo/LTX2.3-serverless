@@ -1,6 +1,6 @@
 # Customization
 
-This guide covers methods for adding your own models, custom nodes, and static input files into a custom `worker-comfyui`.
+This guide covers methods for adding your own models, custom nodes, and static input files into a custom image derived from this worker.
 
 > [!TIP]
 >
@@ -14,22 +14,22 @@ This guide covers methods for adding your own models, custom nodes, and static i
 
 There are two primary methods for **manual** customization:
 
-1.  **Custom Dockerfile (recommended for manual setup):** Create your own `Dockerfile` starting `FROM` one of the official `worker-comfyui` base images. This allows you to bake specific custom nodes, models, and input files directly into your image using `comfy-cli` commands. **This method does not require forking the `worker-comfyui` repository.**
+1.  **Custom Dockerfile (recommended for manual setup):** Create your own `Dockerfile` starting `FROM` one of this repository's base images. This allows you to bake specific custom nodes, models, and input files directly into your image using `comfy-cli` commands. **This method does not require forking the repository.**
 2.  **Network Volume:** Store models on a persistent network volume attached to your RunPod endpoint. This is useful if you frequently change models or have very large models you don't want to include in the image build process.
 
 ## Method 1: Custom Dockerfile
 
 > [!NOTE]
 >
-> This method does NOT require forking the `worker-comfyui` repository.
+> This method does NOT require forking the repository.
 
 This is the most flexible and recommended approach for creating reproducible, customized worker environments.
 
 1.  **Create a `Dockerfile`:** In your own project directory, create a file named `Dockerfile`.
 2.  **Start with a Base Image:** Begin your `Dockerfile` by referencing one of the official base images. Using the `-base` tag is recommended as it provides a clean ComfyUI install with necessary tools like `comfy-cli` but without pre-packaged models.
     ```Dockerfile
-    # start from a clean base image (replace <version> with the desired [release](https://github.com/runpod-workers/worker-comfyui/releases))
-    FROM runpod/worker-comfyui:<version>-base
+    # start from a clean base image (replace <version> with the desired release)
+    FROM your-dockerhub-id/ltx23-worker:<version>-base-cuda12.8.1
     ```
 3.  **Install Custom Nodes:** Use the `comfy-node-install` (we had introduce our own cli tool here, as there is a [problem with comfy-cli not showing errors during installation](https://github.com/Comfy-Org/comfy-cli/pull/275)) command to add custom nodes by their name or URL, see [Comfy Registry](https://registry.comfy.org) to find the correct name. You can list multiple nodes.
     ```Dockerfile
@@ -68,7 +68,7 @@ Once you have created your custom `Dockerfile`, refer to the [Deployment Guide](
 
 ```Dockerfile
 # start from a clean base image (replace <version> with the desired release)
-FROM runpod/worker-comfyui:5.1.0-base
+FROM your-dockerhub-id/ltx23-worker:latest-base-cuda12.8.1
 
 # install custom nodes using comfy-cli
 RUN comfy-node-install comfyui-kjnodes comfyui-ic-light comfyui_ipadapter_plus comfyui_essentials ComfyUI-Hangover-Nodes

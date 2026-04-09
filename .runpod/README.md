@@ -6,7 +6,7 @@ Run [LTX 2.3](https://huggingface.co/Lightricks/LTX-2.3) video workflows on [Com
 
 ---
 
-[![RunPod](https://api.runpod.io/badge/runpod-workers/worker-comfyui)](https://www.runpod.io/console/hub/runpod-workers/worker-comfyui)
+Use the hub metadata in `.runpod/hub.json` when publishing this template to RunPod Hub.
 
 ---
 
