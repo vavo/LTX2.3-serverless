@@ -6,7 +6,7 @@
   "iconUrl": "https://cpjrphpz3t5wbwfe.public.blob.vercel-storage.com/comfy-ui.png",
   "config": {
     "runsOn": "GPU",
-    "containerDiskInGb": 20,
+    "containerDiskInGb": 120,
     "gpuIds": "ADA_24",
     "gpuCount": 1,
     "allowedCudaVersions": ["13.0", "12.8", "12.7", "12.6"],
@@ -29,6 +29,26 @@
           "description": "Store ComfyUI, venv, caches, and downloaded assets on the attached network volume",
           "default": true,
           "advanced": false
+        }
+      },
+      {
+        "key": "LTX23_PRELOAD_UPSCALERS",
+        "input": {
+          "name": "Preload Upscalers",
+          "type": "boolean",
+          "description": "Also preload the official LTX spatial and temporal upscalers into persistent storage",
+          "default": false,
+          "advanced": true
+        }
+      },
+      {
+        "key": "HUGGINGFACE_ACCESS_TOKEN",
+        "input": {
+          "name": "Hugging Face Token",
+          "type": "string",
+          "description": "Optional token for gated or rate-limited model downloads during startup",
+          "default": "",
+          "advanced": true
         }
       },
       {

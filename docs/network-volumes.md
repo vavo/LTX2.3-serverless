@@ -1,6 +1,6 @@
 # Network Volumes & Model Paths
 
-This document explains how to use RunPod **Network Volumes** with `worker-comfyui`, how model paths are resolved inside the container, and how to debug cases where models are not detected.
+This document explains how to use RunPod **Network Volumes** with this worker, how model paths are resolved inside the container, which worker state is persisted on the volume, and how to debug cases where models are not detected.
 
 > **Scope**
 >
@@ -17,6 +17,14 @@ For **Pods**:
 
 - Network volume root is mounted at: `/workspace`
 - Equivalent ComfyUI model path: `/workspace/models/...`
+
+This worker also persists its runtime state under:
+
+- `/workspace/worker-comfyui/comfyui`
+- `/workspace/worker-comfyui/venv`
+- `/workspace/worker-comfyui/cache`
+
+That means ComfyUI itself, the Python environment, and model-download caches can survive worker restarts when a network volume is attached.
 
 If you use the S3-compatible API, the same paths map as:
 

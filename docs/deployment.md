@@ -1,6 +1,6 @@
 # Deployment
 
-This guide explains how to deploy the `worker-comfyui` as a serverless endpoint on RunPod, covering both pre-built official images and custom-built images.
+This guide explains how to deploy this ComfyUI-based LTX 2.3 worker as a RunPod serverless endpoint, covering both pre-built image targets and custom-built images.
 
 ## Deploying Pre-Built Official Images
 
@@ -10,12 +10,12 @@ This is the simplest method if the official images meet your needs.
 
 - Create a [new template](https://runpod.io/console/serverless/user/templates) by clicking on `New Template`
 - In the dialog, configure:
-  - Template Name: `worker-comfyui` (or your preferred name)
+  - Template Name: `ltx2.3-worker` (or your preferred name)
   - Template Type: serverless (change template type to "serverless")
-  - Container Image: Use one of the official tags, e.g., `runpod/worker-comfyui:<version>-sd3`. (Refer to the main [README.md](../README.md#available-docker-images) for available image tags and the current version).
+  - Container Image: Use one of the LTX-oriented tags from the main [README.md](../README.md#available-docker-images), for example `<repo>:<version>-ltx2.3-distilled-cu128`.
   - Container Registry Credentials: Leave as default (images are public).
   - Container Disk: Adjust based on the chosen image tag, see [GPU Recommendations](#gpu-recommendations).
-  - (optional) Environment Variables: Configure S3 or other settings (see [Configuration Guide](configuration.md)).
+  - (optional) Environment Variables: Configure `LTX23_PRELOAD_VARIANT`, `HUGGINGFACE_ACCESS_TOKEN`, S3, or other settings (see [Configuration Guide](configuration.md)).
     - Note: If you don't configure S3, images are returned as base64. For persistent storage across jobs without S3, consider using a [Network Volume](customization.md#method-2-network-volume-alternative-for-models). If models on your network volume are not being detected, see [Network Volumes & Model Paths](network-volumes.md) for troubleshooting steps.
 - Click on `Save Template`
 
@@ -24,30 +24,30 @@ This is the simplest method if the official images meet your needs.
 - Navigate to [`Serverless > Endpoints`](https://www.runpod.io/console/serverless/user/endpoints) and click on `New Endpoint`
 - In the dialog, configure:
 
-  - Endpoint Name: `comfy` (or your preferred name)
+  - Endpoint Name: `ltx2-3` (or your preferred name)
   - Worker configuration: Select a GPU that can run the model included in your chosen image (see [GPU recommendations](#gpu-recommendations)).
   - Active Workers: `0` (Scale as needed based on expected load).
   - Max Workers: `3` (Set a limit based on your budget and scaling needs).
   - GPUs/Worker: `1`
   - Idle Timeout: `5` (Default is usually fine, adjust if needed).
   - Flash Boot: `enabled` (Recommended for faster worker startup).
-  - Select Template: `worker-comfyui` (or the name you gave your template).
-  - (optional) Advanced: If you are using a Network Volume, select it under `Select Network Volume`. See the [Customization Guide](customization.md#method-2-network-volume-alternative-for-models). For detailed model path layout and debugging tips, see [Network Volumes & Model Paths](network-volumes.md).
+  - Select Template: `ltx2.3-worker` (or the name you gave your template).
+  - (optional) Advanced: Attach a Network Volume under `Select Network Volume`. For this repo that is not really optional unless you like paying cold-start tax on every worker boot. See the [Customization Guide](customization.md#method-2-network-volume-alternative-for-models) and [Network Volumes & Model Paths](network-volumes.md).
 
 - Click `deploy`
 - Your endpoint will be created. You can click on it to view the dashboard and find its ID.
 
 ### GPU recommendations (for Official Images)
 
-| Model                     | Image Tag Suffix | Minimum VRAM Required | Recommended Container Size |
-| ------------------------- | ---------------- | --------------------- | -------------------------- |
-| Stable Diffusion XL       | `sdxl`           | 8 GB                  | 15 GB                      |
-| Stable Diffusion 3 Medium | `sd3`            | 5 GB                  | 20 GB                      |
-| FLUX.1 Schnell            | `flux1-schnell`  | 24 GB                 | 30 GB                      |
-| FLUX.1 dev                | `flux1-dev`      | 24 GB                 | 30 GB                      |
-| Base (No models)          | `base`           | N/A                   | 5 GB                       |
+| Target                           | Image Tag Suffix              | Minimum VRAM Required | Recommended Container Size |
+| -------------------------------- | ----------------------------- | --------------------- | -------------------------- |
+| LTX 2.3 distilled                | `ltx2.3-distilled-cu128`      | 32 GB                 | 100 GB                     |
+| LTX 2.3 distilled fp8            | `ltx2.3-distilled-fp8-cu128`  | 24-32 GB              | 100 GB                     |
+| LTX 2.3 distilled, experimental  | `ltx2.3-distilled-cu130`      | 32 GB                 | 100 GB                     |
+| CUDA 12.8 clean base             | `base-cuda12.8.1`             | N/A                   | 20 GB                      |
+| CUDA 13 clean base               | `base-cuda13.0`               | N/A                   | 20 GB                      |
 
-_Note: Container sizes are approximate and might vary slightly. Custom images will vary based on included models/nodes._
+_Note: Container sizes are approximate and assume a network volume for persistent state. Without a network volume, you will need more local disk and much more patience._
 
 ## Deploying Custom Setups
 
