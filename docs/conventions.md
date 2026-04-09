@@ -21,9 +21,9 @@ This document outlines the key operational and structural conventions for the pr
   # Example build command
   docker build --platform linux/amd64 -t my-image:tag .
   ```
-- **Development Builds:** For faster development iterations, use `MODEL_TYPE=base` to skip downloading external models:
+- **Development Builds:** For faster development iterations, build the clean base target and keep model/state downloads on the persistent workspace:
   ```bash
-  docker build --build-arg MODEL_TYPE=base -t ltx23-worker:dev .
+  docker build --target base --platform linux/amd64 -t ltx23-worker:dev .
   ```
 - **Customization:** Follow the methods in the `README.md` for adding custom models/nodes (Network Volume or Dockerfile edits + snapshots).
 
@@ -47,7 +47,7 @@ This document outlines the key operational and structural conventions for the pr
 - **Code Changes:** After modifying handler code, always rebuild the Docker image before testing with `docker-compose`:
   ```bash
   docker-compose down
-  docker build --build-arg MODEL_TYPE=base -t ltx23-worker:dev .
+  docker build --target base -t ltx23-worker:dev .
   docker-compose up -d
   ```
 - **Debugging:** Use strategic logging/print statements to understand external API responses (like ComfyUI's error formats) before implementing error handling.

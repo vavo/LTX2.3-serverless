@@ -65,8 +65,11 @@ replace_with_symlink() {
 
 write_extra_model_paths() {
     local base_path="$1"
+    local output_file="${2:-/comfyui/extra_model_paths.yaml}"
 
-    cat > /comfyui/extra_model_paths.yaml <<EOF
+    mkdir -p "$(dirname "${output_file}")"
+
+    cat > "${output_file}" <<EOF
 runpod_worker_comfy:
   base_path: ${base_path}
   checkpoints: models/checkpoints/
@@ -86,6 +89,12 @@ EOF
 }
 
 bootstrap_workspace() {
+    local comfy_image_root="${COMFY_IMAGE_ROOT:-/comfyui}"
+    local comfy_runtime_root="${COMFY_RUNTIME_ROOT:-/comfyui}"
+    local venv_image_root="${VENV_IMAGE_ROOT:-/opt/venv}"
+    local venv_runtime_root="${VENV_RUNTIME_ROOT:-/opt/venv}"
+    local extra_model_paths_file="${EXTRA_MODEL_PATHS_FILE:-${comfy_runtime_root}/extra_model_paths.yaml}"
+
     if [ "${PERSIST_WORKSPACE:-true}" != "true" ]; then
         bootstrap_log "Workspace persistence disabled"
         return
@@ -96,7 +105,9 @@ bootstrap_workspace() {
 
     if [ -z "${persistent_root}" ]; then
         bootstrap_log "No persistent workspace mount detected; using image-local paths"
-        write_extra_model_paths "/runpod-volume"
+        export PATH="${venv_runtime_root}/bin:${PATH}"
+        export COMFY_MODEL_ROOT="${COMFY_MODEL_ROOT:-${comfy_runtime_root}/models}"
+        write_extra_model_paths "${comfy_runtime_root}" "${extra_model_paths_file}"
         return
     fi
 
@@ -117,13 +128,13 @@ bootstrap_workspace() {
         "${cache_root}/uv" \
         "${cache_root}/xdg"
 
-    seed_directory_if_missing /comfyui "${comfy_root}" "ComfyUI root"
-    seed_directory_if_missing /opt/venv "${venv_root}" "Python virtualenv"
+    seed_directory_if_missing "${comfy_image_root}" "${comfy_root}" "ComfyUI root"
+    seed_directory_if_missing "${venv_image_root}" "${venv_root}" "Python virtualenv"
 
-    replace_with_symlink /comfyui "${comfy_root}"
-    replace_with_symlink /opt/venv "${venv_root}"
+    replace_with_symlink "${comfy_runtime_root}" "${comfy_root}"
+    replace_with_symlink "${venv_runtime_root}" "${venv_root}"
 
-    export PATH="/opt/venv/bin:${PATH}"
+    export PATH="${venv_runtime_root}/bin:${PATH}"
     export HF_HOME="${cache_root}/huggingface"
     export PIP_CACHE_DIR="${cache_root}/pip"
     export TORCH_HOME="${cache_root}/torch"
@@ -132,7 +143,7 @@ bootstrap_workspace() {
     export XDG_CACHE_HOME="${cache_root}/xdg"
     export COMFY_MODEL_ROOT="${WORKSPACE_ROOT}/models"
 
-    write_extra_model_paths "${WORKSPACE_ROOT}"
+    write_extra_model_paths "${WORKSPACE_ROOT}" "${extra_model_paths_file}"
 
     bootstrap_log "Using persistent workspace at ${WORKSPACE_ROOT}"
     bootstrap_log "ComfyUI root: ${comfy_root}"

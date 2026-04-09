@@ -2,8 +2,6 @@
 
 This guide covers setting up your local environment for developing and testing this LTX-focused ComfyUI worker.
 
-Both tests will use the data from [`test_input.json`](../test_input.json), so make your changes in there to test different workflow inputs properly.
-
 ## Setup
 
 ### Prerequisites
@@ -89,6 +87,17 @@ Unit tests are provided to verify the core logic of the `handler.py`.
 
   # Example: Run a single test method
   python -m unittest tests.test_handler.TestRunpodWorkerComfy.test_s3_upload
+  ```
+
+## Testing the Bootstrap Scripts
+
+The persistence and LTX preload paths are covered by shell tests and do not depend on the legacy [`test_input.json`](../test_input.json) payload.
+
+- **Run all shell tests**:
+  ```bash
+  bash tests/test_restore_snapshot.sh
+  bash tests/test_bootstrap_workspace.sh
+  bash tests/test_bootstrap_ltx23.sh
   ```
 
 ## Local API Simulation (using Docker Compose)

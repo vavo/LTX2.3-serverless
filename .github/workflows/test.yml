@@ -22,6 +22,13 @@ jobs:
         run: |
           bash -n src/*.sh
           bash -n scripts/*.sh
+          bash -n tests/*.sh
+
+      - name: Run shell tests
+        run: |
+          bash tests/test_restore_snapshot.sh
+          bash tests/test_bootstrap_workspace.sh
+          bash tests/test_bootstrap_ltx23.sh
 
       - name: Validate JSON files
         run: |
