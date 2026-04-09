@@ -7,6 +7,21 @@ Enable diagnostics by setting NETWORK_VOLUME_DEBUG=true environment variable.
 
 import os
 
+
+def get_persistent_root():
+    """Return the active persistent root used by the worker."""
+    configured_root = os.environ.get("WORKSPACE_ROOT")
+    if configured_root:
+        return configured_root
+
+    if os.path.isdir("/workspace"):
+        return "/workspace"
+
+    if os.path.isdir("/runpod-volume"):
+        return "/runpod-volume"
+
+    return "/runpod-volume"
+
 # Expected model types and their file extensions
 MODEL_TYPES = {
     "checkpoints": [".safetensors", ".ckpt", ".pt", ".pth", ".bin"],
@@ -53,12 +68,12 @@ def run_network_volume_diagnostics():
         )
 
     # Check network volume mount
-    runpod_volume = "/runpod-volume"
-    print(f"\n[2] Checking network volume mount at {runpod_volume}...")
-    if os.path.isdir(runpod_volume):
-        print(f"    ✓ MOUNTED: {runpod_volume}")
+    persistent_root = get_persistent_root()
+    print(f"\n[2] Checking network volume mount at {persistent_root}...")
+    if os.path.isdir(persistent_root):
+        print(f"    ✓ MOUNTED: {persistent_root}")
     else:
-        print(f"    ✗ NOT MOUNTED: {runpod_volume}")
+        print(f"    ✗ NOT MOUNTED: {persistent_root}")
         print(
             "    Make sure you have attached a network volume to your serverless endpoint."
         )
@@ -67,7 +82,7 @@ def run_network_volume_diagnostics():
 
     # Check directory structure
     print("\n[3] Checking directory structure...")
-    models_dir = os.path.join(runpod_volume, "models")
+    models_dir = os.path.join(persistent_root, "models")
     if os.path.isdir(models_dir):
         print(f"    ✓ FOUND: {models_dir}")
     else:
@@ -132,7 +147,7 @@ def run_network_volume_diagnostics():
 def print_expected_structure():
     """Print the expected directory structure for the network volume."""
     print("\n    Expected directory structure:")
-    print("    /runpod-volume/")
+    print("    <persistent-root>/")
     print("    └── models/")
     print("        ├── checkpoints/    <- Put your .safetensors/.ckpt models here")
     print("        ├── loras/          <- Put your LoRA files here")

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
+source /bootstrap_workspace.sh
+bootstrap_workspace
+
 # Start SSH server if PUBLIC_KEY is set (enables remote access and dev-sync.sh)
-if [ -n "$PUBLIC_KEY" ]; then
+if [ -n "${PUBLIC_KEY:-}" ]; then
     mkdir -p ~/.ssh
-    echo "$PUBLIC_KEY" > ~/.ssh/authorized_keys
+    echo "${PUBLIC_KEY}" > ~/.ssh/authorized_keys
     chmod 700 ~/.ssh
     chmod 600 ~/.ssh/authorized_keys
 
@@ -59,7 +64,7 @@ echo "worker-comfyui: Starting ComfyUI"
 COMFY_PID_FILE="/tmp/comfyui.pid"
 
 # Serve the API and don't shutdown the container
-if [ "$SERVE_API_LOCALLY" == "true" ]; then
+if [ "${SERVE_API_LOCALLY:-false}" == "true" ]; then
     python -u /comfyui/main.py --disable-auto-launch --disable-metadata --listen --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
     echo $! > "$COMFY_PID_FILE"
 

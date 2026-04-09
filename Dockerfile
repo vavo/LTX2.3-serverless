@@ -9,6 +9,8 @@ ARG COMFYUI_VERSION=latest
 ARG CUDA_VERSION_FOR_COMFY
 ARG ENABLE_PYTORCH_UPGRADE=false
 ARG PYTORCH_INDEX_URL
+ARG PYTORCH_PACKAGES="torch torchvision torchaudio"
+ARG EXTRA_PYTHON_PACKAGES=""
 
 # Prevents prompts from packages asking for user input during installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -59,7 +61,7 @@ RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
 
 # Upgrade PyTorch if needed (for newer CUDA versions)
 RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
-      uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
+      uv pip install --force-reinstall ${PYTORCH_PACKAGES} --index-url ${PYTORCH_INDEX_URL}; \
     fi
 
 # Change working directory to ComfyUI
@@ -74,9 +76,15 @@ WORKDIR /
 # Install Python runtime dependencies for the handler
 RUN uv pip install runpod requests websocket-client
 
+# Optional image-level extras for specific GPU/model stacks.
+RUN if [ -n "${EXTRA_PYTHON_PACKAGES}" ]; then \
+      uv pip install ${EXTRA_PYTHON_PACKAGES}; \
+    fi
+
 # Add application code and scripts
-ADD src/start.sh src/network_volume.py handler.py test_input.json ./
+ADD src/start.sh src/bootstrap_workspace.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
+RUN chmod +x /bootstrap_workspace.sh
 
 # Add script to install custom nodes
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
