@@ -1,207 +1,154 @@
 # LTX2.3 Serverless Worker
 
-> [ComfyUI](https://github.com/comfyanonymous/ComfyUI) + [LTX 2.3](https://huggingface.co/Lightricks/LTX-2.3) as a serverless video inference worker on [RunPod](https://www.runpod.io/)
+Serverless LTX 2.3, minus the goldfish-memory cold start.
+
+This repo turns ComfyUI + LTX 2.3 into a RunPod serverless template that keeps its brain on `/workspace`: Comfy install, Python venv, caches, and downloaded model assets survive worker churn instead of being painfully rediscovered on every boot.
+
+Less boot drama. More actual inference.
 
 <p align="center">
   <img src="assets/worker_sitting_in_comfy_chair.jpg" title="Worker sitting in comfy chair" />
 </p>
 
-RunPod hub metadata is included in [`.runpod/hub.json`](./.runpod/hub.json); publish the hub entry before wiring a public badge.
+## Why This Exists
 
----
+- Builds LTX-oriented Docker targets for RunPod serverless.
+- Uses Python 3.12 and a persistent `/workspace` bootstrap for ComfyUI, the venv, and caches.
+- Installs the official `ComfyUI-LTXVideo` nodes in the LTX image targets.
+- Targets CUDA 12.8 by default and CUDA 13 experimentally for newer Blackwell-oriented deployments.
+- Can preload the main LTX 2.3 checkpoint at startup into persistent storage.
+- Can also preload the official latent upscalers and distilled LoRA for the two-stage distilled path.
 
-This project is a RunPod serverless template for LTX 2.3 video inference on top of the generic ComfyUI worker pattern. It is tuned for persistent `/workspace` state so ComfyUI, the Python venv, caches, custom nodes, and downloaded model assets can survive worker churn instead of being re-fetched every time RunPod decides to rediscover entropy.
+## Current Truth
 
-## Table of Contents
+### Works today
 
-- [Quickstart](#quickstart)
-- [Available Docker Images](#available-docker-images)
-- [API Specification](#api-specification)
-- [Usage](#usage)
-- [Getting the Workflow JSON](#getting-the-workflow-json)
-- [Further Documentation](#further-documentation)
+- RunPod serverless worker around ComfyUI.
+- Persistent state on `/workspace` via network volume.
+- LTX-focused image targets:
+  - `<repo>:<version>-ltx2.3-distilled-cu128`
+  - `<repo>:<version>-ltx2.3-distilled-fp8-cu128`
+  - `<repo>:<version>-ltx2.3-distilled-cu130`
+  - `<repo>:<version>-base-cuda12.8.1`
+  - `<repo>:<version>-base-cuda13.0`
+- Standard RunPod endpoints: `/run`, `/runsync`, `/health`.
+- Input workflow JSON plus optional input images.
+- Output handling for image outputs from ComfyUI.
 
----
+### Not true yet
+
+- This repo does **not** currently return video or audio artifacts in the API response.
+- The handler currently collects `output.images` only. If your workflow emits `SaveVideo`, `CreateVideo`, audio, or other non-image outputs, those outputs are not returned by the API yet.
+- There is no checked-in canonical LTX API sample workflow in the repo yet.
+
+If you want proper video-file responses, that is a handler feature still waiting for its promotion.
+
+## Why It Wins
+
+LTX 2.3 is interesting. Rebuilding Comfy, reinstalling nodes, and redownloading weights on every serverless boot is not.
+
+This repo optimizes the boring part:
+
+- keep the expensive state on `/workspace`
+- use a sane CUDA matrix for newer Nvidia cards
+- make RunPod serverless usable for LTX workflows without turning deployment into a ritual
+
+## Recommended Targets
+
+| Target | Use Case |
+| --- | --- |
+| `ltx2-3-distilled` | Default target for CUDA 12.8 deployments |
+| `ltx2-3-distilled-fp8` | Lower VRAM pressure with the FP8 distilled checkpoint |
+| `ltx2-3-distilled-cuda13` | Experimental CUDA 13 path for newer Blackwell-oriented stacks |
+| `base-cuda12-8-1` | Clean CUDA 12.8 base image for custom LTX builds |
+| `base-cuda13-0` | Clean CUDA 13 base image for custom experimental builds |
+
+## Hardware Baseline
+
+- CUDA 12.8 is the default target in this repo.
+- CUDA 13 is supported here as an experimental path.
+- The LTX / ComfyUI docs recommend 32GB+ VRAM and 100GB+ free disk for a comfortable setup.
+- For the CUDA 12.8 path, PyTorch 2.8+ is the intended floor.
+- For the CUDA 13 path, official `cu130` wheels start at PyTorch 2.9+, so treat that lane accordingly.
 
 ## Quickstart
 
-1.  Build or use one of the LTX-oriented image targets from [docker-bake.hcl](./docker-bake.hcl), preferably `ltx2-3-distilled` for CUDA 12.8 or `ltx2-3-distilled-cuda13` if you are specifically targeting newer Blackwell-friendly hosts.
-2.  Attach a RunPod network volume so `/workspace` is persistent across worker boots.
-3.  Deploy the image as a serverless endpoint and keep active workers at `0` unless you enjoy paying for idle silicon.
-4.  Export an LTX workflow from ComfyUI using `Workflow > Export (API)`.
-5.  Send the workflow to `/run` or `/runsync` as described below.
+1. Build or publish one of the LTX image targets from [`docker-bake.hcl`](./docker-bake.hcl).
+2. Create a RunPod serverless template that uses that image.
+3. Attach a network volume so `/workspace` is persistent.
+4. Deploy the endpoint with `Active Workers = 0` unless you enjoy paying for idle GPUs.
+5. Set at least:
+   - `PERSIST_WORKSPACE=true`
+   - `LTX23_PRELOAD_VARIANT=distilled`
+6. Export your ComfyUI workflow with `Workflow > Export (API)`.
+7. Send it to `/run` or `/runsync`.
 
-## Available Docker Images
-
-Key image targets in this repository:
-
-- **`<repo>:<version>-ltx2.3-distilled-cu128`**: CUDA 12.8 base, latest ComfyUI, official `ComfyUI-LTXVideo` nodes, LTX 2.3 distilled checkpoint preloaded into persistent storage on first boot.
-- **`<repo>:<version>-ltx2.3-distilled-fp8-cu128`**: Same as above, but with the FP8 distilled checkpoint for lower VRAM pressure.
-- **`<repo>:<version>-ltx2.3-distilled-cu130`**: Experimental CUDA 13 image for newer Blackwell-oriented stacks. This uses PyTorch's `cu130` wheels, which currently start at 2.9 rather than 2.8.
-- **`<repo>:<version>-base-cuda12.8.1`**: Clean CUDA 12.8 ComfyUI base for custom LTX or non-LTX builds.
-- **`<repo>:<version>-base-cuda13.0`**: Clean CUDA 13 base for newer Nvidia hosts where you want to bring your own workflow, nodes, and model strategy.
-
-The repository still carries the generic image targets from upstream, but the useful ones for this template are the LTX 2.3 and modern CUDA variants.
-
-## LTX Notes
-
-- Official LTX guidance for ComfyUI is to install `ComfyUI-LTXVideo` and let the nodes auto-download required assets on first use.
-- This worker can also preload the main LTX 2.3 checkpoint at boot via `LTX23_PRELOAD_VARIANT`, with files landing under the persistent model root on `/workspace`.
-- If `LTX23_PRELOAD_UPSCALERS=true`, the worker also preloads the official LTX spatial/temporal upscalers into `models/latent_upscale_models` and the distilled LoRA into `models/loras` for the two-stage distilled path.
-- The current default LTX preload choices are `distilled`, `dev`, `distilled-fp8`, and `dev-fp8`.
-- A network volume is effectively mandatory here unless you want every cold worker to rediscover the same multi-GB files like it has short-term memory loss.
-
-## GPU Baseline
-
-- CUDA 12.8 is the default target for this repo.
-- CUDA 13 is provided as an experimental track for Blackwell-era deployments.
-- LTX's own ComfyUI documentation recommends a CUDA-capable GPU with 32GB+ VRAM and 100GB+ free disk for a comfortable setup.
-
-## API Specification
-
-The worker exposes standard RunPod serverless endpoints (`/run`, `/runsync`, `/health`). By default, images are returned as base64 strings. You can configure the worker to upload images to an S3 bucket instead by setting specific environment variables (see [Configuration Guide](docs/configuration.md)).
-
-Use the `/runsync` endpoint for synchronous requests that wait for the job to complete and return the result directly. Use the `/run` endpoint for asynchronous requests that return immediately with a job ID; you'll need to poll the `/status` endpoint separately to get the result.
+## API Contract Today
 
 ### Input
 
-```json
-{
-  "input": {
-    "workflow": {
-      "6": {
-        "inputs": {
-          "text": "a ball on the table",
-          "clip": ["30", 1]
-        },
-        "class_type": "CLIPTextEncode",
-        "_meta": {
-          "title": "CLIP Text Encode (Positive Prompt)"
-        }
-      }
-    },
-    "images": [
-      {
-        "name": "input_image_1.png",
-        "image": "data:image/png;base64,iVBOR..."
-      }
-    ]
-  }
-}
-```
+The worker accepts:
 
-The following tables describe the fields within the `input` object:
-
-| Field Path                | Type   | Required | Description                                                                                                                                |
-| ------------------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `input`                   | Object | Yes      | Top-level object containing request data.                                                                                                  |
-| `input.workflow`          | Object | Yes      | The ComfyUI workflow exported in the [required format](#getting-the-workflow-json).                                                        |
-| `input.images`            | Array  | No       | Optional array of input images. Each image is uploaded to ComfyUI's `input` directory and can be referenced by its `name` in the workflow. |
-| `input.comfy_org_api_key` | String | No       | Optional per-request Comfy.org API key for API Nodes. Overrides the `COMFY_ORG_API_KEY` environment variable if both are set.              |
-
-#### `input.images` Object
-
-Each object within the `input.images` array must contain:
-
-| Field Name | Type   | Required | Description                                                                                                                       |
-| ---------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `name`     | String | Yes      | Filename used to reference the image in the workflow (e.g., via a "Load Image" node). Must be unique within the array.            |
-| `image`    | String | Yes      | Base64 encoded string of the image. A data URI prefix (e.g., `data:image/png;base64,`) is optional and will be handled correctly. |
-
-> [!NOTE]
->
-> **Size Limits:** RunPod endpoints have request size limits (e.g., 10MB for `/run`, 20MB for `/runsync`). Large base64 input images can exceed these limits. See [RunPod Docs](https://docs.runpod.io/docs/serverless-endpoint-urls).
+- `input.workflow`: required ComfyUI API workflow JSON
+- `input.images`: optional list of base64-encoded input images
+- `input.comfy_org_api_key`: optional per-request Comfy.org API key
 
 ### Output
 
-> [!WARNING]
->
-> **Breaking Change in Output Format (5.0.0+)**
->
-> Versions `< 5.0.0` returned the primary image data (S3 URL or base64 string) directly within an `output.message` field.
-> Starting with `5.0.0`, the output format has changed significantly, see below
+The worker currently returns:
+
+- `output.images[]` when the workflow produces image outputs
+- optional `output.errors[]` for non-fatal warnings
+
+Image entries look like this:
 
 ```json
 {
-  "id": "sync-uuid-string",
-  "status": "COMPLETED",
-  "output": {
-    "images": [
-      {
-        "filename": "ComfyUI_00001_.png",
-        "type": "base64",
-        "data": "iVBORw0KGgoAAAANSUhEUg..."
-      }
-    ]
-  },
-  "delayTime": 123,
-  "executionTime": 4567
+  "filename": "ComfyUI_00001_.png",
+  "type": "base64",
+  "data": "iVBORw0KGgoAAAANSUhEUg..."
 }
 ```
 
-| Field Path      | Type             | Required | Description                                                                                                 |
-| --------------- | ---------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `output`        | Object           | Yes      | Top-level object containing the results of the job execution.                                               |
-| `output.images` | Array of Objects | No       | Present if the workflow generated images. Contains a list of objects, each representing one output image.   |
-| `output.errors` | Array of Strings | No       | Present if non-fatal errors or warnings occurred during processing (e.g., S3 upload failure, missing data). |
+If S3 is configured, `type` becomes `s3_url`.
 
-#### `output.images`
-
-Each object in the `output.images` array has the following structure:
-
-| Field Name | Type   | Description                                                                                     |
-| ---------- | ------ | ----------------------------------------------------------------------------------------------- |
-| `filename` | String | The original filename assigned by ComfyUI during generation.                                    |
-| `type`     | String | Indicates the format of the data. Either `"base64"` or `"s3_url"` (if S3 upload is configured). |
-| `data`     | String | Contains either the base64 encoded image string or the S3 URL for the uploaded image file.      |
-
-> [!NOTE]
-> The `output.images` field provides a list of all generated images (excluding temporary ones).
->
-> - If S3 upload is **not** configured (default), `type` will be `"base64"` and `data` will contain the base64 encoded image string.
-> - If S3 upload **is** configured, `type` will be `"s3_url"` and `data` will contain the S3 URL. See the [Configuration Guide](docs/configuration.md#example-s3-response) for an S3 example response.
-> - Clients interacting with the API need to handle this list-based structure under `output.images`.
-
-## Usage
-
-To interact with your deployed RunPod endpoint:
-
-1.  **Get API Key:** Generate a key in RunPod [User Settings](https://www.runpod.io/console/serverless/user/settings) (`API Keys` section).
-2.  **Get Endpoint ID:** Find your endpoint ID on the [Serverless Endpoints](https://www.runpod.io/console/serverless/user/endpoints) page or on the `Overview` page of your endpoint.
-
-### Generate Image (Sync Example)
-
-Send a workflow to the `/runsync` endpoint (waits for completion). Replace `<api_key>` and `<endpoint_id>`. The `-d` value should contain the [JSON input described above](#input).
+## Minimal Request Example
 
 ```bash
 curl -X POST \
-  -H "Authorization: Bearer <api_key>" \
+  -H "Authorization: Bearer <runpod_api_key>" \
   -H "Content-Type: application/json" \
-  -d '{"input":{"workflow":{... your workflow JSON ...}}}' \
+  -d '{"input":{"workflow":{... your Comfy API workflow ...}}}' \
   https://api.runpod.ai/v2/<endpoint_id>/runsync
 ```
 
-You can also use the `/run` endpoint for asynchronous jobs and then poll the `/status` to see when the job is done. Or you [add a `webhook` into your request](https://docs.runpod.io/serverless/endpoints/send-requests#webhook-notifications) to be notified when the job is done.
+## Environment Variables That Matter
 
-Refer to [`test_input.json`](./test_input.json) for a complete input example.
+| Variable | What It Does |
+| --- | --- |
+| `PERSIST_WORKSPACE` | Persist ComfyUI, venv, caches, and downloaded assets on the network volume |
+| `WORKSPACE_ROOT` | Override the detected persistent root |
+| `WORKSPACE_STATE_ROOT` | Override where worker state lives inside the persistent root |
+| `LTX23_PRELOAD_VARIANT` | Preload `distilled`, `dev`, `distilled-fp8`, or `dev-fp8` |
+| `LTX23_PRELOAD_UPSCALERS` | Also preload the official LTX latent upscalers and distilled LoRA |
+| `HUGGINGFACE_ACCESS_TOKEN` | Optional Hugging Face token for startup downloads |
+| `COMFY_ORG_API_KEY` | Optional Comfy.org API key |
+| `BUCKET_ENDPOINT_URL` | Enable S3 upload mode for image outputs |
 
-## Getting the Workflow JSON
+The full list lives in [docs/configuration.md](./docs/configuration.md).
 
-To get the correct `workflow` JSON for the API:
+## Facts Worth Knowing
 
-1.  Open ComfyUI in your browser.
-2.  In the top navigation, select `Workflow > Export (API)`
-3.  A `workflow.json` file will be downloaded. Use the content of this file as the value for the `input.workflow` field in your API requests.
+- The worker bootstraps persistent state under `/workspace/worker-comfyui`.
+- LTX image targets install `ComfyUI-LTXVideo` from Lightricks.
+- The startup bootstrap can seed ComfyUI and the venv into persistent storage on first run.
+- The current local `test_input.json` is legacy and not an LTX example.
 
-## SSH Access
+## Docs
 
-To enable SSH access to the worker, set the `PUBLIC_KEY` environment variable to your SSH public key. The worker will start an SSH server automatically. Make sure to expose **port 22** in your RunPod template so you can connect.
-
-## Further Documentation
-
-- **[Deployment Guide](docs/deployment.md):** Detailed steps for deploying on RunPod.
-- **[Configuration Guide](docs/configuration.md):** Full list of environment variables (including S3 setup).
-- **[Customization Guide](docs/customization.md):** Adding custom models and nodes (Network Volumes, Docker builds).
-- **[Development Guide](docs/development.md):** Setting up a local environment for development & testing
-- **[CI/CD Guide](docs/ci-cd.md):** Information about the automated Docker build and publish workflows.
-- **[Acknowledgments](docs/acknowledgments.md):** Credits and thanks
+- [Deployment Guide](./docs/deployment.md)
+- [Configuration Guide](./docs/configuration.md)
+- [Customization Guide](./docs/customization.md)
+- [Network Volumes](./docs/network-volumes.md)
+- [Development Guide](./docs/development.md)
+- [CI/CD Guide](./docs/ci-cd.md)
