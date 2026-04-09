@@ -75,10 +75,26 @@ https://huggingface.co/Lightricks/LTX-2.3/resolve/main/ltx-2.3-temporal-upscaler
 EOF
 }
 
+ltx_distilled_lora_url() {
+    printf '%s\n' "https://huggingface.co/Lightricks/LTX-2.3/resolve/main/ltx-2.3-22b-distilled-lora-384.safetensors"
+}
+
+ltx_is_distilled_variant() {
+    case "$1" in
+        distilled|distilled-fp8)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 bootstrap_ltx23() {
     local variant="${LTX23_PRELOAD_VARIANT:-}"
     local checkpoint_dir="${LTX23_CHECKPOINT_DIR:-${COMFY_MODEL_ROOT:-/comfyui/models}/checkpoints/LTX-Video}"
-    local upscale_dir="${LTX23_UPSCALER_DIR:-${COMFY_MODEL_ROOT:-/comfyui/models}/checkpoints/LTX-Video}"
+    local upscale_dir="${LTX23_UPSCALER_DIR:-${COMFY_MODEL_ROOT:-/comfyui/models}/latent_upscale_models/LTX-Video}"
+    local lora_dir="${LTX23_LORA_DIR:-${COMFY_MODEL_ROOT:-/comfyui/models}/loras/LTX-Video}"
     local token
     token="$(ltx_hf_token)"
 
@@ -99,6 +115,12 @@ bootstrap_ltx23() {
             [ -n "${url}" ] || continue
             ltx_download "${url}" "${upscale_dir}/$(basename "${url}")" "${token}"
         done < <(ltx_upscaler_urls)
+
+        if ltx_is_distilled_variant "${variant}"; then
+            local distilled_lora_url
+            distilled_lora_url="$(ltx_distilled_lora_url)"
+            ltx_download "${distilled_lora_url}" "${lora_dir}/$(basename "${distilled_lora_url}")" "${token}"
+        fi
     fi
 
     ltx_log "LTX checkpoint preload finished. Remaining assets such as Gemma/text-encoder weights can still auto-download via ComfyUI-LTXVideo on first run."

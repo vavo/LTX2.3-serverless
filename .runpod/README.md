@@ -27,7 +27,7 @@ Run [LTX 2.3](https://huggingface.co/Lightricks/LTX-2.3) video workflows on [Com
 ## Important environment variables
 
 - `LTX23_PRELOAD_VARIANT`: `distilled`, `dev`, `distilled-fp8`, or `dev-fp8`
-- `LTX23_PRELOAD_UPSCALERS`: preload official LTX spatial and temporal upscalers
+- `LTX23_PRELOAD_UPSCALERS`: preload official LTX spatial and temporal upscalers plus the distilled LoRA for the two-stage path
 - `HUGGINGFACE_ACCESS_TOKEN`: optional token for startup downloads
 - `COMFY_ORG_API_KEY`: optional key for Comfy.org API nodes
 

@@ -47,6 +47,7 @@ The repository still carries the generic image targets from upstream, but the us
 
 - Official LTX guidance for ComfyUI is to install `ComfyUI-LTXVideo` and let the nodes auto-download required assets on first use.
 - This worker can also preload the main LTX 2.3 checkpoint at boot via `LTX23_PRELOAD_VARIANT`, with files landing under the persistent model root on `/workspace`.
+- If `LTX23_PRELOAD_UPSCALERS=true`, the worker also preloads the official LTX spatial/temporal upscalers into `models/latent_upscale_models` and the distilled LoRA into `models/loras` for the two-stage distilled path.
 - The current default LTX preload choices are `distilled`, `dev`, `distilled-fp8`, and `dev-fp8`.
 - A network volume is effectively mandatory here unless you want every cold worker to rediscover the same multi-GB files like it has short-term memory loss.
 
