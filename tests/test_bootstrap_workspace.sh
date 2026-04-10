@@ -109,4 +109,32 @@ mkdir -p "${LOCAL_RUNTIME_COMFY}/models"
 
 assert_file_contains "${LOCAL_EXTRA_MODEL_PATHS_FILE}" "base_path: ${LOCAL_RUNTIME_COMFY}"
 
+LOCK_DIR="${WORKSPACE_ROOT}/worker-comfyui/.bootstrap.lock"
+mkdir -p "${WORKSPACE_ROOT}/worker-comfyui"
+
+(
+    source "${SCRIPT_TO_TEST}"
+    acquire_bootstrap_lock "${LOCK_DIR}"
+    sleep 2
+    release_bootstrap_lock "${LOCK_DIR}"
+) &
+LOCK_HOLDER_PID=$!
+
+sleep 1
+LOCK_WAIT_START=$(date +%s)
+(
+    export BOOTSTRAP_LOCK_TIMEOUT_SECONDS=10
+    export BOOTSTRAP_LOCK_POLL_SECONDS=1
+    source "${SCRIPT_TO_TEST}"
+    acquire_bootstrap_lock "${LOCK_DIR}"
+    release_bootstrap_lock "${LOCK_DIR}"
+)
+LOCK_WAIT_ELAPSED=$(( $(date +%s) - LOCK_WAIT_START ))
+wait "${LOCK_HOLDER_PID}"
+
+[ "${LOCK_WAIT_ELAPSED}" -ge 1 ] || {
+    echo "Expected bootstrap lock acquisition to wait for existing holder"
+    exit 1
+}
+
 echo "✅ bootstrap_workspace persistence and fallback behavior verified"

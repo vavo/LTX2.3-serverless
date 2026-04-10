@@ -17,6 +17,12 @@ This document outlines the environment variables available for configuring the w
 | `LTX23_PRELOAD_UPSCALERS` | When `true`, also preload the official LTX latent upscalers and distilled LoRA for the two-stage path.                                                                  | `false` |
 | `COMFYUI_MANAGER_CONFIG` | Override the ComfyUI-Manager `config.ini` path used by `comfy-manager-set-mode`.                                                                                             | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
 
+## Bootstrap Locking
+
+When multiple workers share the same persisted `/workspace`, the bootstrap now uses a shared lock at `/workspace/worker-comfyui/.bootstrap.lock` while seeding the persisted ComfyUI root and Python virtualenv.
+
+That prevents concurrent first-boot workers from trampling the same shared venv. If a worker dies while holding the lock, stale-lock cleanup will eventually remove it.
+
 ## Runtime Paths
 
 With workspace persistence enabled, the worker uses these paths:
@@ -27,10 +33,11 @@ With workspace persistence enabled, the worker uses these paths:
 | ComfyUI code and user config | `/workspace/worker-comfyui/comfyui` |
 | Python virtualenv | `/workspace/worker-comfyui/venv` |
 | Download and compiler caches | `/workspace/worker-comfyui/cache` |
+| Shared bootstrap lock | `/workspace/worker-comfyui/.bootstrap.lock` |
 | Shared model root | `/workspace/models` |
 | Generated model-path config | `/comfyui/extra_model_paths.yaml` |
-| Current handler input staging | `/workspace/ComfyUI/input` |
-| Current handler output pickup | `/workspace/ComfyUI/output` |
+| Current handler input staging | `/comfyui/input` |
+| Current handler output pickup | `/comfyui/output` |
 | ComfyUI-Manager config | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
 
 On serverless, `/workspace` is the worker's internal alias for `/runpod-volume`.

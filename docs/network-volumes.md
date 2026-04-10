@@ -25,8 +25,10 @@ This worker also persists its runtime state under:
 - `/workspace/worker-comfyui/comfyui`
 - `/workspace/worker-comfyui/venv`
 - `/workspace/worker-comfyui/cache`
+- `/workspace/worker-comfyui/.bootstrap.lock`
 
 That means ComfyUI itself, the Python environment, and model-download caches can survive worker restarts when a network volume is attached.
+The bootstrap lock is there specifically to stop multiple workers from trying to seed the same shared persisted venv at the same time.
 
 ## Path Cheat Sheet
 
@@ -39,13 +41,14 @@ With persistence enabled, the current runtime uses these paths:
 | Persisted ComfyUI root | `/workspace/worker-comfyui/comfyui` |
 | Persisted Python venv | `/workspace/worker-comfyui/venv` |
 | Persisted caches | `/workspace/worker-comfyui/cache` |
+| Shared bootstrap lock | `/workspace/worker-comfyui/.bootstrap.lock` |
 | Shared model root | `/workspace/models` |
 | Generated extra model paths file | `/comfyui/extra_model_paths.yaml` |
-| Current handler input staging | `/workspace/ComfyUI/input` |
-| Current handler output pickup | `/workspace/ComfyUI/output` |
+| Current handler input staging | `/comfyui/input` |
+| Current handler output pickup | `/comfyui/output` |
 | ComfyUI-Manager config | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
 
-The input and output paths above reflect the current handler implementation, even though the persisted ComfyUI root lives under `/workspace/worker-comfyui/comfyui`. Yes, the naming is inconsistent. No, the filesystem does not care.
+The input and output paths above reflect the current handler implementation. The persisted ComfyUI root still lives under `/workspace/worker-comfyui/comfyui`, and `/comfyui` points at that persisted root after bootstrap.
 
 If you use the S3-compatible API, the same paths map as:
 

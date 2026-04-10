@@ -34,6 +34,67 @@ detect_persistent_root() {
     printf '%s\n' ""
 }
 
+reset_incomplete_seed_directory() {
+    local target_dir="$1"
+    local label="$2"
+    local backup_dir="${target_dir}.resetting.$$"
+
+    bootstrap_log "Found incomplete ${label} seed at ${target_dir}; resetting"
+
+    if mv "${target_dir}" "${backup_dir}"; then
+        rm -rf "${backup_dir}" >/dev/null 2>&1 || \
+            bootstrap_log "Deferred cleanup needed for ${backup_dir}"
+        return
+    fi
+
+    bootstrap_log "Could not move incomplete ${label} seed; deleting in place"
+    rm -rf "${target_dir}"
+}
+
+acquire_bootstrap_lock() {
+    local lock_dir="$1"
+    local timeout_seconds="${BOOTSTRAP_LOCK_TIMEOUT_SECONDS:-600}"
+    local poll_seconds="${BOOTSTRAP_LOCK_POLL_SECONDS:-2}"
+    local stale_seconds="${BOOTSTRAP_LOCK_STALE_SECONDS:-1800}"
+    local start_ts
+    local now_ts
+    local lock_ts
+
+    start_ts="$(date +%s)"
+
+    while ! mkdir "${lock_dir}" 2>/dev/null; do
+        now_ts="$(date +%s)"
+        lock_ts=0
+
+        if [ -f "${lock_dir}/timestamp" ]; then
+            lock_ts="$(cat "${lock_dir}/timestamp" 2>/dev/null || printf '0')"
+        fi
+
+        if [ "${lock_ts}" -gt 0 ] && [ $((now_ts - lock_ts)) -ge "${stale_seconds}" ]; then
+            bootstrap_log "Removing stale bootstrap lock at ${lock_dir}"
+            rm -rf "${lock_dir}" 2>/dev/null || true
+            continue
+        fi
+
+        if [ $((now_ts - start_ts)) -ge "${timeout_seconds}" ]; then
+            bootstrap_log "Timed out waiting for bootstrap lock at ${lock_dir}"
+            return 1
+        fi
+
+        bootstrap_log "Waiting for bootstrap lock at ${lock_dir}"
+        sleep "${poll_seconds}"
+    done
+
+    date +%s > "${lock_dir}/timestamp"
+    printf '%s\n' "$$" > "${lock_dir}/pid"
+}
+
+release_bootstrap_lock() {
+    local lock_dir="$1"
+
+    rm -rf "${lock_dir}" 2>/dev/null || true
+}
+
 seed_directory_if_missing() {
     local source_dir="$1"
     local target_dir="$2"
@@ -46,8 +107,7 @@ seed_directory_if_missing() {
     fi
 
     if [ -d "${target_dir}" ] && find "${target_dir}" -mindepth 1 -maxdepth 1 -print -quit >/dev/null 2>&1; then
-        bootstrap_log "Found incomplete ${label} seed at ${target_dir}; resetting"
-        rm -rf "${target_dir}"
+        reset_incomplete_seed_directory "${target_dir}" "${label}"
     fi
 
     bootstrap_log "Seeding ${label} into ${target_dir}"
@@ -122,6 +182,7 @@ bootstrap_workspace() {
     local comfy_root="${state_root}/comfyui"
     local venv_root="${state_root}/venv"
     local cache_root="${state_root}/cache"
+    local bootstrap_lock_dir="${state_root}/.bootstrap.lock"
 
     mkdir -p \
         "${state_root}" \
@@ -132,8 +193,14 @@ bootstrap_workspace() {
         "${cache_root}/triton" \
         "${cache_root}/xdg"
 
+    acquire_bootstrap_lock "${bootstrap_lock_dir}"
+    trap 'release_bootstrap_lock "'"${bootstrap_lock_dir}"'"' RETURN
+
     seed_directory_if_missing "${comfy_image_root}" "${comfy_root}" "ComfyUI root"
     seed_directory_if_missing "${venv_image_root}" "${venv_root}" "Python virtualenv"
+
+    trap - RETURN
+    release_bootstrap_lock "${bootstrap_lock_dir}"
 
     replace_with_symlink "${comfy_runtime_root}" "${comfy_root}"
     replace_with_symlink "${venv_runtime_root}" "${venv_root}"
