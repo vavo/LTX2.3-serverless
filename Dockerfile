@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # Build argument for base image selection
 ARG BASE_IMAGE=nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 
@@ -27,7 +29,9 @@ ENV PYTHONUNBUFFERED=1
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
 # Install Python, git and other necessary tools
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
     git \
@@ -40,10 +44,10 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     openssh-server \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
-    && ln -sf /usr/bin/pip3 /usr/bin/pip
-
-# Clean up to reduce image size
-RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
+    && apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create the virtualenv with Python.
 RUN python -m venv /opt/venv
@@ -53,18 +57,21 @@ ENV VIRTUAL_ENV="/opt/venv"
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install comfy-cli + base Python tooling used by the image.
-RUN python -m pip install --upgrade pip setuptools wheel \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install comfy-cli triton
 
 # Install ComfyUI
-RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
       /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
     else \
       /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
     fi
 
 # Upgrade PyTorch if needed (for newer CUDA versions)
-RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
       python -m pip install --force-reinstall ${PYTORCH_PACKAGES} --index-url ${PYTORCH_INDEX_URL}; \
     fi
 
@@ -79,10 +86,12 @@ WORKDIR /
 
 # Install Python runtime dependencies for the handler
 ADD requirements.txt ./
-RUN python -m pip install -r /requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    python -m pip install -r /requirements.txt
 
 # Optional image-level extras for specific GPU/model stacks.
-RUN if [ -n "${EXTRA_PYTHON_PACKAGES}" ]; then \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    if [ -n "${EXTRA_PYTHON_PACKAGES}" ]; then \
       if [ -n "${EXTRA_PYTHON_INDEX_URL}" ]; then \
         python -m pip install --index-url ${EXTRA_PYTHON_INDEX_URL} ${EXTRA_PYTHON_PACKAGES}; \
       else \
@@ -108,7 +117,8 @@ COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 
 # Install the official LTX ComfyUI nodes when requested by the image target.
-RUN if [ "${INSTALL_LTX_VIDEO_NODES}" = "true" ]; then \
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    if [ "${INSTALL_LTX_VIDEO_NODES}" = "true" ]; then \
       git clone --depth=1 --branch "${LTX_VIDEO_REF}" https://github.com/Lightricks/ComfyUI-LTXVideo.git /comfyui/custom_nodes/ComfyUI-LTXVideo && \
       python -m pip install -r /comfyui/custom_nodes/ComfyUI-LTXVideo/requirements.txt; \
     fi
