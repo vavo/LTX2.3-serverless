@@ -9,12 +9,31 @@ This document outlines the environment variables available for configuring the w
 | `REFRESH_WORKER`     | When `true`, the worker pod will stop after each completed job to ensure a clean state for the next job. See the [RunPod documentation](https://docs.runpod.io/docs/handler-additional-controls#refresh-worker) for details. | `false` |
 | `SERVE_API_LOCALLY`  | When `true`, enables a local HTTP server simulating the RunPod environment for development and testing. See the [Development Guide](development.md#local-api) for more details.                                              | `false` |
 | `COMFY_ORG_API_KEY`  | Comfy.org API key to enable ComfyUI API Nodes. If set, it is sent with each workflow; clients can override per request via `input.api_key_comfy_org`.                                                                        | –       |
-| `PERSIST_WORKSPACE`  | When `true`, persist ComfyUI, the Python venv, caches, and downloaded assets on the attached network volume under `/workspace`.                                                                                             | `true`  |
+| `PERSIST_WORKSPACE`  | When `true`, persist ComfyUI, the Python venv, caches, and downloaded assets under `/workspace` (which aliases `/runpod-volume` on serverless).                                                                            | `true`  |
 | `WORKSPACE_ROOT`     | Override the detected persistent workspace root. Useful only if your mount layout differs from RunPod defaults.                                                                                                              | auto    |
 | `WORKSPACE_STATE_ROOT` | Override the state directory inside the persistent workspace.                                                                                                                         | `/workspace/worker-comfyui` |
 | `HUGGINGFACE_ACCESS_TOKEN` | Optional token used for startup downloads and other Hugging Face fetches.                                                                                                      | –       |
 | `LTX23_PRELOAD_VARIANT` | Optional LTX checkpoint preload at worker startup: `distilled`, `dev`, `distilled-fp8`, or `dev-fp8`.                                                                     | empty   |
 | `LTX23_PRELOAD_UPSCALERS` | When `true`, also preload the official LTX latent upscalers and distilled LoRA for the two-stage path.                                                                  | `false` |
+| `COMFYUI_MANAGER_CONFIG` | Override the ComfyUI-Manager `config.ini` path used by `comfy-manager-set-mode`.                                                                                             | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+
+## Runtime Paths
+
+With workspace persistence enabled, the worker uses these paths:
+
+| Purpose | Path |
+| ------- | ---- |
+| Persistent root | `/workspace` |
+| ComfyUI code and user config | `/workspace/worker-comfyui/comfyui` |
+| Python virtualenv | `/workspace/worker-comfyui/venv` |
+| Download and compiler caches | `/workspace/worker-comfyui/cache` |
+| Shared model root | `/workspace/models` |
+| Generated model-path config | `/comfyui/extra_model_paths.yaml` |
+| Current handler input staging | `/workspace/ComfyUI/input` |
+| Current handler output pickup | `/workspace/ComfyUI/output` |
+| ComfyUI-Manager config | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+
+On serverless, `/workspace` is the worker's internal alias for `/runpod-volume`.
 
 ## Logging Configuration
 

@@ -139,7 +139,11 @@ The full list lives in [docs/configuration.md](./docs/configuration.md).
 
 ## Facts Worth Knowing
 
-- The worker bootstraps persistent state under `/workspace/worker-comfyui`.
+- On serverless, the volume is mounted at `/runpod-volume`, but the worker normalizes on `/workspace` internally by creating `/workspace -> /runpod-volume` when needed.
+- The worker bootstraps persistent ComfyUI state under `/workspace/worker-comfyui`.
+- ComfyUI model directories are mapped from `/workspace/models/...` via `/comfyui/extra_model_paths.yaml`. On serverless that is the same storage as `/runpod-volume/models/...`.
+- The current handler stages API input files in `/workspace/ComfyUI/input` and reads generated artifacts from `/workspace/ComfyUI/output`.
+- ComfyUI-Manager configuration lives at `/comfyui/user/default/ComfyUI-Manager/config.ini` unless `COMFYUI_MANAGER_CONFIG` overrides it.
 - LTX image targets install `ComfyUI-LTXVideo` from Lightricks.
 - The startup bootstrap can seed ComfyUI and the venv into persistent storage on first run.
 - The current local `test_input.json` is legacy and not an LTX example.

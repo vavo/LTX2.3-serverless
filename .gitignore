@@ -7,3 +7,18 @@ simulated_uploaded
 __pycache__
 node_modules
 .buildx-cache/
+
+# Python/test junk
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor noise
+.vscode/
+.idea/
+
+# Build/debug
+*.log
+core
+core.*
+.buildx-cache-new/

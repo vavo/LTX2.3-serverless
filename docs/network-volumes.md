@@ -4,14 +4,16 @@ This document explains how to use RunPod **Network Volumes** with this worker, h
 
 > **Scope**
 >
-> These instructions apply to **serverless endpoints** using this worker. Pods mount network volumes at `/workspace` by default, while serverless workers see them at `/runpod-volume`.
+> These instructions apply to **serverless endpoints** using this worker. Pods mount network volumes at `/workspace` by default. Serverless workers see the volume at `/runpod-volume`, and this worker creates a `/workspace` alias to that path so the runtime can use one internal root.
 
 ## Directory Mapping
 
 For **serverless endpoints**:
 
 - Network volume root is mounted at: `/runpod-volume`
-- ComfyUI models are expected under: `/runpod-volume/models/...`
+- Worker-internal persistent root is normalized to: `/workspace`
+- ComfyUI models are therefore resolved from: `/workspace/models/...`
+- This is the same storage as: `/runpod-volume/models/...`
 
 For **Pods**:
 
@@ -26,6 +28,25 @@ This worker also persists its runtime state under:
 
 That means ComfyUI itself, the Python environment, and model-download caches can survive worker restarts when a network volume is attached.
 
+## Path Cheat Sheet
+
+With persistence enabled, the current runtime uses these paths:
+
+| Purpose | Path |
+| ------- | ---- |
+| Persistent root | `/workspace` |
+| Serverless mount backing that root | `/runpod-volume` |
+| Persisted ComfyUI root | `/workspace/worker-comfyui/comfyui` |
+| Persisted Python venv | `/workspace/worker-comfyui/venv` |
+| Persisted caches | `/workspace/worker-comfyui/cache` |
+| Shared model root | `/workspace/models` |
+| Generated extra model paths file | `/comfyui/extra_model_paths.yaml` |
+| Current handler input staging | `/workspace/ComfyUI/input` |
+| Current handler output pickup | `/workspace/ComfyUI/output` |
+| ComfyUI-Manager config | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+
+The input and output paths above reflect the current handler implementation, even though the persisted ComfyUI root lives under `/workspace/worker-comfyui/comfyui`. Yes, the naming is inconsistent. No, the filesystem does not care.
+
 If you use the S3-compatible API, the same paths map as:
 
 - Serverless: `/runpod-volume/my-folder/file.txt`
@@ -37,7 +58,7 @@ If you use the S3-compatible API, the same paths map as:
 Models must be placed in the following structure on your network volume:
 
 ```text
-/runpod-volume/
+/workspace/
 └── models/
     ├── checkpoints/      # Stable Diffusion checkpoints (.safetensors, .ckpt)
     ├── loras/            # LoRA files (.safetensors, .pt)
@@ -53,7 +74,7 @@ Models must be placed in the following structure on your network volume:
 
 > **Note**
 >
-> Only create the subdirectories you actually need; empty or missing folders are fine.
+> Only create the subdirectories you actually need; empty or missing folders are fine. On serverless, `/workspace/models/...` and `/runpod-volume/models/...` are the same underlying storage.
 
 ## Supported File Extensions
 
