@@ -45,19 +45,16 @@ RUN apt-get update && apt-get install -y \
 # Clean up to reduce image size
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Install uv (latest) and create the virtualenv with Python.
-# `uv venv` can segfault under QEMU during linux/amd64 builds on Apple Silicon.
-RUN wget -qO- https://astral.sh/uv/install.sh | sh \
-    && ln -s /root/.local/bin/uv /usr/local/bin/uv \
-    && ln -s /root/.local/bin/uvx /usr/local/bin/uvx \
-    && python -m venv /opt/venv
+# Create the virtualenv with Python.
+RUN python -m venv /opt/venv
 
 # Use the virtual environment for all subsequent commands
 ENV VIRTUAL_ENV="/opt/venv"
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install comfy-cli + base Python tooling used by the image.
-RUN uv pip install comfy-cli pip setuptools wheel triton
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && python -m pip install comfy-cli triton
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
@@ -68,7 +65,7 @@ RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
 
 # Upgrade PyTorch if needed (for newer CUDA versions)
 RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
-      uv pip install --force-reinstall ${PYTORCH_PACKAGES} --index-url ${PYTORCH_INDEX_URL}; \
+      python -m pip install --force-reinstall ${PYTORCH_PACKAGES} --index-url ${PYTORCH_INDEX_URL}; \
     fi
 
 # Change working directory to ComfyUI
@@ -82,14 +79,14 @@ WORKDIR /
 
 # Install Python runtime dependencies for the handler
 ADD requirements.txt ./
-RUN uv pip install -r /requirements.txt
+RUN python -m pip install -r /requirements.txt
 
 # Optional image-level extras for specific GPU/model stacks.
 RUN if [ -n "${EXTRA_PYTHON_PACKAGES}" ]; then \
       if [ -n "${EXTRA_PYTHON_INDEX_URL}" ]; then \
-        uv pip install --index-url ${EXTRA_PYTHON_INDEX_URL} ${EXTRA_PYTHON_PACKAGES}; \
+        python -m pip install --index-url ${EXTRA_PYTHON_INDEX_URL} ${EXTRA_PYTHON_PACKAGES}; \
       else \
-        uv pip install ${EXTRA_PYTHON_PACKAGES}; \
+        python -m pip install ${EXTRA_PYTHON_PACKAGES}; \
       fi; \
     fi
 
@@ -113,7 +110,7 @@ RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 # Install the official LTX ComfyUI nodes when requested by the image target.
 RUN if [ "${INSTALL_LTX_VIDEO_NODES}" = "true" ]; then \
       git clone --depth=1 --branch "${LTX_VIDEO_REF}" https://github.com/Lightricks/ComfyUI-LTXVideo.git /comfyui/custom_nodes/ComfyUI-LTXVideo && \
-      uv pip install -r /comfyui/custom_nodes/ComfyUI-LTXVideo/requirements.txt; \
+      python -m pip install -r /comfyui/custom_nodes/ComfyUI-LTXVideo/requirements.txt; \
     fi
 
 ENV LTX23_PRELOAD_VARIANT="${LTX23_PRELOAD_VARIANT}"
