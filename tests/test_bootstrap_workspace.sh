@@ -61,7 +61,7 @@ assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded 
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 assert_file_contains "${EXTRA_MODEL_PATHS_FILE}" "base_path: ${WORKSPACE_ROOT}"
 
-for cache_dir in huggingface pip torch triton uv xdg; do
+for cache_dir in huggingface pip torch triton xdg; do
     [ -d "${WORKSPACE_ROOT}/worker-comfyui/cache/${cache_dir}" ] || {
         echo "Missing cache directory ${cache_dir}"
         exit 1

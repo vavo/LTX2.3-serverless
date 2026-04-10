@@ -125,7 +125,6 @@ bootstrap_workspace() {
         "${cache_root}/pip" \
         "${cache_root}/torch" \
         "${cache_root}/triton" \
-        "${cache_root}/uv" \
         "${cache_root}/xdg"
 
     seed_directory_if_missing "${comfy_image_root}" "${comfy_root}" "ComfyUI root"
@@ -139,7 +138,6 @@ bootstrap_workspace() {
     export PIP_CACHE_DIR="${cache_root}/pip"
     export TORCH_HOME="${cache_root}/torch"
     export TRITON_CACHE_DIR="${cache_root}/triton"
-    export UV_CACHE_DIR="${cache_root}/uv"
     export XDG_CACHE_HOME="${cache_root}/xdg"
     export COMFY_MODEL_ROOT="${WORKSPACE_ROOT}/models"
 

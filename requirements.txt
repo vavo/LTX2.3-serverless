@@ -3,3 +3,6 @@ runpod~=1.9.0
 cryptography==46.0.7
 websocket-client
 requests
+aiohttp
+redis
+boto3
