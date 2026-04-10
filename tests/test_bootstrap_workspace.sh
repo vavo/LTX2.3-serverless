@@ -76,6 +76,16 @@ run_persistent_bootstrap
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded comfy"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 
+rm -f "${WORKSPACE_ROOT}/worker-comfyui/venv/.worker-seeded"
+mkdir -p "${WORKSPACE_ROOT}/worker-comfyui/venv/lib/python3.12/site-packages/einops"
+printf 'stale partial seed\n' > "${WORKSPACE_ROOT}/worker-comfyui/venv/lib/python3.12/site-packages/einops/__init__.py"
+run_persistent_bootstrap
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "mutated venv"
+[ ! -e "${WORKSPACE_ROOT}/worker-comfyui/venv/lib/python3.12/site-packages/einops/__init__.py" ] || {
+    echo "Expected stale partial venv contents to be removed"
+    exit 1
+}
+
 LOCAL_RUNTIME_COMFY="${TEST_DIR}/local-comfy"
 LOCAL_EXTRA_MODEL_PATHS_FILE="${TEST_DIR}/local-extra_model_paths.yaml"
 mkdir -p "${LOCAL_RUNTIME_COMFY}/models"

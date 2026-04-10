@@ -7,6 +7,27 @@ bootstrap_workspace
 source /bootstrap_ltx23.sh
 bootstrap_ltx23
 
+start_local_redis() {
+    export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
+
+    case "${REDIS_URL}" in
+        redis://localhost*|redis://127.0.0.1*)
+            if redis-cli -u "${REDIS_URL}" ping >/dev/null 2>&1; then
+                echo "worker-comfyui: Redis already available at ${REDIS_URL}"
+                return
+            fi
+
+            echo "worker-comfyui: Starting local Redis at ${REDIS_URL}"
+            redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes --save "" --appendonly no
+            ;;
+        *)
+            echo "worker-comfyui: Using external Redis at ${REDIS_URL}"
+            ;;
+    esac
+}
+
+start_local_redis
+
 # Start SSH server if PUBLIC_KEY is set (enables remote access and dev-sync.sh)
 if [ -n "${PUBLIC_KEY:-}" ]; then
     mkdir -p ~/.ssh

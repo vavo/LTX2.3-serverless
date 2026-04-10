@@ -10,6 +10,7 @@
 # ==============================================================================
 
 import runpod
+import base64
 import json
 import os
 import random
@@ -30,14 +31,16 @@ logging.basicConfig(level=logging.INFO, format='{"time":"%(asctime)s", "level":"
 logger = logging.getLogger("Indro-V5")
 
 API_KEY_SECRET = os.environ.get("INDRO_API_KEY", "dev_token_123")
-NSFW_BANNED_WORDS = {"nude", "nsfw", "blood", "gore", "explicit", "kill"} # Basic proxy for safety
+NSFW_BANNED_WORDS = {"child", "children", "kids", "teen", "lolita", "underage"} # Basic proxy for safety
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 redis_client = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=5, retry_on_timeout=True)
 
 COMFY_NODES = os.environ.get("COMFY_NODES", "127.0.0.1:8188").split(",")
-COMFY_INPUT_DIR = "/workspace/ComfyUI/input"
-COMFY_OUTPUT_DIR = "/workspace/ComfyUI/output"
+COMFY_INPUT_DIR = os.environ.get("COMFY_INPUT_DIR", "/comfyui/input")
+COMFY_OUTPUT_DIR = os.environ.get("COMFY_OUTPUT_DIR", "/comfyui/output")
+MAX_INLINE_VIDEO_MB = int(os.environ.get("MAX_INLINE_VIDEO_MB", "50"))
+CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "604800"))
 
 try:
     with open('video_ltx2_3_i2v_API.json', 'r') as f:
@@ -109,6 +112,35 @@ async def upload_to_s3_with_retry(filepath: str, job_id: str) -> str:
             if attempt == 2: raise e
             await asyncio.sleep(2 ** attempt)
 
+
+def decode_cached_response(raw_value: str) -> dict | None:
+    try:
+        cached_response = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError):
+        return None
+
+    if not isinstance(cached_response, dict) or cached_response.get("status") != "success":
+        return None
+
+    response = dict(cached_response)
+    response["cached"] = True
+    return response
+
+
+async def build_result_payload(filepath: str, job_id: str) -> dict:
+    if os.environ.get("AWS_BUCKET_NAME"):
+        return {"video_url": await upload_to_s3_with_retry(filepath, job_id)}
+
+    file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+    if file_size_mb > MAX_INLINE_VIDEO_MB:
+        raise RuntimeError(
+            f"Video output is {file_size_mb:.1f}MB, which exceeds MAX_INLINE_VIDEO_MB={MAX_INLINE_VIDEO_MB}. "
+            "Configure S3 upload or raise the inline limit."
+        )
+
+    with open(filepath, "rb") as video_file:
+        return {"video_base64": base64.b64encode(video_file.read()).decode("utf-8")}
+
 # --- 5. THE MASTER HANDLER ---
 async def handler(job: dict) -> dict:
     job_id = job.get('id', uuid.uuid4().hex)
@@ -152,9 +184,10 @@ async def handler(job: dict) -> dict:
         lock_token = str(uuid.uuid4()) # Unique token for THIS specific worker
 
         redis_state = await redis_client.get(cache_hash)
-        if redis_state and redis_state.startswith("http"):
+        cached_response = decode_cached_response(redis_state)
+        if cached_response:
             await redis_client.hset(f"job_status:{job_id}", mapping={"status": "completed", "cache_hit": "true"})
-            return {"status": "success", "video_url": redis_state, "cached": True}
+            return cached_response
 
         # Attempt to acquire lock
         lock_acquired = await redis_client.set(cache_hash, lock_token, ex=1200, nx=True)
@@ -164,8 +197,9 @@ async def handler(job: dict) -> dict:
             for _ in range(240):
                 await asyncio.sleep(5)
                 new_state = await redis_client.get(cache_hash)
-                if new_state and new_state.startswith("http"):
-                    return {"status": "success", "video_url": new_state, "cached": True}
+                cached_response = decode_cached_response(new_state)
+                if cached_response:
+                    return cached_response
             raise TimeoutError("Deduplication timeout.")
 
         http_timeout = aiohttp.ClientTimeout(total=1000)
@@ -226,20 +260,21 @@ async def handler(job: dict) -> dict:
             # 6. Upload & Cleanup
             await redis_client.hset(f"job_status:{job_id}", mapping={"status": "uploading"})
             output_video_path = os.path.join(COMFY_OUTPUT_DIR, video_filename)
-            s3_url = await upload_to_s3_with_retry(output_video_path, job_id)
+            result_payload = await build_result_payload(output_video_path, job_id)
+            response = {
+                "status": "success",
+                **result_payload,
+                "metadata": {"render_time_sec": round(time.time() - start_time, 2), "node_used": target_node},
+            }
             
             # SAFE LOCK RELEASE: Only update Redis if WE still hold the lock
             current_lock = await redis_client.get(cache_hash)
             if current_lock == lock_token:
-                await redis_client.set(cache_hash, s3_url, ex=604800)
+                await redis_client.set(cache_hash, json.dumps(response), ex=CACHE_TTL_SECONDS)
 
             await redis_client.hset(f"job_status:{job_id}", mapping={"status": "completed"})
-            
-            return {
-                "status": "success",
-                "video_url": s3_url,
-                "metadata": {"render_time_sec": round(time.time() - start_time, 2), "node_used": target_node}
-            }
+
+            return response
 
     except Exception as e:
         # SAFE LOCK DELETION ON CRASH

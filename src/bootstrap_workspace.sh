@@ -45,6 +45,11 @@ seed_directory_if_missing() {
         return
     fi
 
+    if [ -d "${target_dir}" ] && find "${target_dir}" -mindepth 1 -maxdepth 1 -print -quit >/dev/null 2>&1; then
+        bootstrap_log "Found incomplete ${label} seed at ${target_dir}; resetting"
+        rm -rf "${target_dir}"
+    fi
+
     bootstrap_log "Seeding ${label} into ${target_dir}"
     mkdir -p "${target_dir}"
     cp -a "${source_dir}/." "${target_dir}/"
