@@ -45,17 +45,19 @@ RUN apt-get update && apt-get install -y \
 # Clean up to reduce image size
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Install uv (latest) using official installer and create isolated venv
+# Install uv (latest) and create the virtualenv with Python.
+# `uv venv` can segfault under QEMU during linux/amd64 builds on Apple Silicon.
 RUN wget -qO- https://astral.sh/uv/install.sh | sh \
     && ln -s /root/.local/bin/uv /usr/local/bin/uv \
     && ln -s /root/.local/bin/uvx /usr/local/bin/uvx \
-    && uv venv /opt/venv
+    && python -m venv /opt/venv
 
 # Use the virtual environment for all subsequent commands
+ENV VIRTUAL_ENV="/opt/venv"
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Install comfy-cli + dependencies needed by it to install ComfyUI
-RUN uv pip install comfy-cli pip setuptools wheel
+# Install comfy-cli + base Python tooling used by the image.
+RUN uv pip install comfy-cli pip setuptools wheel triton
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
