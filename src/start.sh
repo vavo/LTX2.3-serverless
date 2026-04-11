@@ -47,8 +47,13 @@ if [ -n "${PUBLIC_KEY:-}" ]; then
 fi
 
 # Use libtcmalloc for better memory management
-TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
-export LD_PRELOAD="${TCMALLOC}"
+TCMALLOC="$(ldconfig -p 2>/dev/null | grep -Po "libtcmalloc\.so\.\d+" | head -n 1 || true)"
+if [ -n "${TCMALLOC}" ]; then
+    export LD_PRELOAD="${TCMALLOC}"
+    echo "worker-comfyui: Using tcmalloc via ${TCMALLOC}"
+else
+    echo "worker-comfyui: tcmalloc not found; continuing without LD_PRELOAD"
+fi
 
 # ---------------------------------------------------------------------------
 # GPU pre-flight check
