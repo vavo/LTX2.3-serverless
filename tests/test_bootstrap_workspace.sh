@@ -137,4 +137,22 @@ wait "${LOCK_HOLDER_PID}"
     exit 1
 }
 
+mkdir -p "${LOCK_DIR}"
+printf '%s\n' $(( $(date +%s) - 10 )) > "${LOCK_DIR}/timestamp"
+STALE_WAIT_START=$(date +%s)
+(
+    export BOOTSTRAP_LOCK_TIMEOUT_SECONDS=10
+    export BOOTSTRAP_LOCK_POLL_SECONDS=1
+    export BOOTSTRAP_LOCK_STALE_SECONDS=2
+    source "${SCRIPT_TO_TEST}"
+    acquire_bootstrap_lock "${LOCK_DIR}"
+    release_bootstrap_lock "${LOCK_DIR}"
+)
+STALE_WAIT_ELAPSED=$(( $(date +%s) - STALE_WAIT_START ))
+
+[ "${STALE_WAIT_ELAPSED}" -lt 5 ] || {
+    echo "Expected stale bootstrap lock to be cleared promptly"
+    exit 1
+}
+
 echo "✅ bootstrap_workspace persistence and fallback behavior verified"

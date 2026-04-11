@@ -55,7 +55,8 @@ acquire_bootstrap_lock() {
     local lock_dir="$1"
     local timeout_seconds="${BOOTSTRAP_LOCK_TIMEOUT_SECONDS:-600}"
     local poll_seconds="${BOOTSTRAP_LOCK_POLL_SECONDS:-2}"
-    local stale_seconds="${BOOTSTRAP_LOCK_STALE_SECONDS:-1800}"
+    local stale_seconds="${BOOTSTRAP_LOCK_STALE_SECONDS:-120}"
+    local heartbeat_seconds="${BOOTSTRAP_LOCK_HEARTBEAT_SECONDS:-5}"
     local start_ts
     local now_ts
     local lock_ts
@@ -87,10 +88,28 @@ acquire_bootstrap_lock() {
 
     date +%s > "${lock_dir}/timestamp"
     printf '%s\n' "$$" > "${lock_dir}/pid"
+
+    (
+        while [ -d "${lock_dir}" ]; do
+            date +%s > "${lock_dir}/timestamp" 2>/dev/null || true
+            sleep "${heartbeat_seconds}"
+        done
+    ) &
+    printf '%s\n' "$!" > "${lock_dir}/heartbeat.pid"
 }
 
 release_bootstrap_lock() {
     local lock_dir="$1"
+    local heartbeat_pid=""
+
+    if [ -f "${lock_dir}/heartbeat.pid" ]; then
+        heartbeat_pid="$(cat "${lock_dir}/heartbeat.pid" 2>/dev/null || true)"
+    fi
+
+    if [ -n "${heartbeat_pid}" ]; then
+        kill "${heartbeat_pid}" 2>/dev/null || true
+        wait "${heartbeat_pid}" 2>/dev/null || true
+    fi
 
     rm -rf "${lock_dir}" 2>/dev/null || true
 }
