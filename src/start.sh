@@ -9,16 +9,49 @@ bootstrap_ltx23
 
 start_local_redis() {
     export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
+    local redis_ping_output=""
+    local redis_start_output=""
 
     case "${REDIS_URL}" in
         redis://localhost*|redis://127.0.0.1*)
-            if redis-cli -u "${REDIS_URL}" ping >/dev/null 2>&1; then
+            if ! command -v redis-cli >/dev/null 2>&1; then
+                echo "worker-comfyui: redis-cli is not installed; cannot verify Redis at ${REDIS_URL}" >&2
+                exit 1
+            fi
+
+            if redis_ping_output="$(redis-cli -u "${REDIS_URL}" ping 2>&1)" && [ "${redis_ping_output}" = "PONG" ]; then
                 echo "worker-comfyui: Redis already available at ${REDIS_URL}"
                 return
             fi
 
+            if ! command -v redis-server >/dev/null 2>&1; then
+                echo "worker-comfyui: redis-server is not installed; cannot start local Redis for ${REDIS_URL}" >&2
+                exit 1
+            fi
+
             echo "worker-comfyui: Starting local Redis at ${REDIS_URL}"
-            redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes --save "" --appendonly no
+
+            if ! redis_start_output="$(redis-server --daemonize yes --bind 127.0.0.1 --protected-mode yes --save "" --appendonly no 2>&1)"; then
+                echo "worker-comfyui: Redis failed to start at ${REDIS_URL}" >&2
+                if [ -n "${redis_start_output}" ]; then
+                    echo "worker-comfyui: ${redis_start_output}" >&2
+                fi
+                exit 1
+            fi
+
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+                if redis_ping_output="$(redis-cli -u "${REDIS_URL}" ping 2>&1)" && [ "${redis_ping_output}" = "PONG" ]; then
+                    echo "worker-comfyui: Redis ready at ${REDIS_URL}"
+                    return
+                fi
+                sleep 1
+            done
+
+            echo "worker-comfyui: Redis failed readiness check at ${REDIS_URL}" >&2
+            if [ -n "${redis_ping_output}" ]; then
+                echo "worker-comfyui: redis-cli ping returned: ${redis_ping_output}" >&2
+            fi
+            exit 1
             ;;
         *)
             echo "worker-comfyui: Using external Redis at ${REDIS_URL}"
