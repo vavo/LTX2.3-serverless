@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -20,9 +22,12 @@ from ltx_payload_builder import (
     build_payload,
     seconds_to_frames,
 )
+from workflow_support import apply_input_filename_map, write_input_images
 
 ROOT_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
+COMFY_NODES = os.environ.get("COMFY_NODES", "127.0.0.1:8188").split(",")
+COMFY_INPUT_DIR = os.environ.get("COMFY_INPUT_DIR", "/comfyui/input")
 
 app = FastAPI(title="LTX 2.3 Payload Builder")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
@@ -52,6 +57,99 @@ class SubmitRequest(BaseModel):
         return normalized
 
 
+class PodSubmitRequest(BaseModel):
+    payload: dict[str, Any]
+    timeout_seconds: int = Field(default=900, ge=5, le=3600)
+
+
+def get_run_mode() -> str:
+    run_mode = os.environ.get("RUN_MODE", "").strip().lower()
+    if run_mode in {"worker", "local-api", "pod"}:
+        return run_mode
+    if os.environ.get("SERVE_API_LOCALLY", "").strip().lower() == "true":
+        return "local-api"
+    return "worker"
+
+
+def get_submission_mode() -> str:
+    return "pod" if get_run_mode() == "pod" else "endpoint"
+
+
+def prepare_pod_images(
+    images: list[dict[str, str]] | None,
+) -> tuple[dict[str, str], list[dict[str, str]]]:
+    if not images:
+        return {}, []
+
+    job_prefix = f"frontend-{uuid.uuid4().hex[:12]}"
+    replacements: dict[str, str] = {}
+    prepared_images: list[dict[str, str]] = []
+
+    for image in images:
+        image_name = image.get("name")
+        image_data = image.get("image")
+        if not image_name or not image_data:
+            raise ValueError(
+                "'images' must be a list of objects with 'name' and 'image' keys."
+            )
+
+        scoped_name = str(Path(job_prefix) / Path(image_name)).replace("\\", "/")
+        replacements[image_name] = scoped_name
+        prepared_images.append({"name": scoped_name, "image": image_data})
+
+    return replacements, prepared_images
+
+
+def cleanup_input_files(filepaths: list[str]) -> None:
+    input_root = Path(COMFY_INPUT_DIR).resolve()
+
+    for filepath in filepaths:
+        path = Path(filepath)
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError:
+            continue
+
+    for filepath in filepaths:
+        parent = Path(filepath).parent
+        while parent != input_root and parent.exists():
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent
+
+
+async def wait_for_history(
+    session: aiohttp.ClientSession,
+    target_node: str,
+    prompt_id: str,
+    timeout_seconds: int,
+) -> dict[str, Any]:
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    fail_count = 0
+
+    while True:
+        if asyncio.get_running_loop().time() > deadline:
+            raise TimeoutError("Local ComfyUI render timed out.")
+
+        try:
+            async with session.get(f"http://{target_node}/history/{prompt_id}") as resp:
+                history_data = await resp.json()
+        except Exception:
+            fail_count += 1
+            if fail_count > 5:
+                raise RuntimeError(f"Local ComfyUI node {target_node} is unavailable.")
+            await asyncio.sleep(2)
+            continue
+
+        if prompt_id in history_data:
+            return history_data[prompt_id]
+
+        await asyncio.sleep(2)
+
+
 @app.get("/", response_class=FileResponse)
 async def index() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "index.html")
@@ -74,6 +172,8 @@ async def config() -> dict[str, object]:
         },
         "aspect_ratios": ASPECT_RATIOS,
         "text_to_video_enabled": False,
+        "run_mode": get_run_mode(),
+        "submission_mode": get_submission_mode(),
     }
 
 
@@ -145,3 +245,71 @@ async def submit_payload(request: SubmitRequest) -> dict[str, object]:
         raise HTTPException(status_code=504, detail="Submit request timed out.") from exc
     except aiohttp.ClientError as exc:
         raise HTTPException(status_code=502, detail=f"Submit request failed: {exc}") from exc
+
+
+@app.post("/api/pod-submit")
+async def submit_payload_in_pod(request: PodSubmitRequest) -> dict[str, object]:
+    workflow_input = request.payload.get("input", {})
+    workflow = workflow_input.get("workflow")
+    images = workflow_input.get("images")
+    if not isinstance(workflow, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Payload must include input.workflow for pod submission.",
+        )
+
+    try:
+        name_map, prepared_images = prepare_pod_images(images)
+        prepared_workflow = apply_input_filename_map(workflow, name_map)
+        written_input_files = write_input_images(COMFY_INPUT_DIR, prepared_images)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    target_node = COMFY_NODES[0].strip()
+    if not target_node:
+        cleanup_input_files(written_input_files)
+        raise HTTPException(status_code=500, detail="COMFY_NODES is not configured.")
+
+    timeout = aiohttp.ClientTimeout(total=request.timeout_seconds)
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                f"http://{target_node}/prompt",
+                json={"prompt": prepared_workflow},
+            ) as response:
+                prompt_response = await response.json()
+                prompt_id = prompt_response.get("prompt_id")
+                if response.status >= 400 or not prompt_id:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="Local ComfyUI rejected the workflow submit.",
+                    )
+
+            history_entry = await wait_for_history(
+                session,
+                target_node,
+                prompt_id,
+                request.timeout_seconds,
+            )
+
+        return {
+            "ok": True,
+            "status_code": 200,
+            "content_type": "application/json",
+            "response_json": {
+                "prompt_id": prompt_id,
+                "node_used": target_node,
+                "history": history_entry,
+            },
+            "response_text": None,
+        }
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
+    except aiohttp.ClientError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Local ComfyUI request failed: {exc}",
+        ) from exc
+    finally:
+        cleanup_input_files(written_input_files)

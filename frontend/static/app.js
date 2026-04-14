@@ -4,6 +4,8 @@ const state = {
   file: null,
   payload: null,
   payloadJson: "",
+  runMode: "worker",
+  submissionMode: "endpoint",
 };
 
 const ratioDimensions = {
@@ -33,8 +35,11 @@ const generateButton = document.querySelector("#generate-button");
 const submitButton = document.querySelector("#submit-button");
 const copyButton = document.querySelector("#copy-button");
 const downloadButton = document.querySelector("#download-button");
+const endpointPanel = document.querySelector("#endpoint-panel");
 const endpointUrlField = document.querySelector("#endpoint-url");
 const authTokenField = document.querySelector("#auth-token");
+const submitModeTitle = document.querySelector("#submit-mode-title");
+const submitModeCopy = document.querySelector("#submit-mode-copy");
 const responsePanel = document.querySelector("#response-panel");
 const responseSummary = document.querySelector("#response-summary");
 const responseOutput = document.querySelector("#response-output");
@@ -68,6 +73,23 @@ function updateAspectButtons() {
     button.classList.toggle("aspect-button-active", isActive);
     button.setAttribute("aria-checked", String(isActive));
   });
+}
+
+function updateSubmitModeUi() {
+  if (state.submissionMode === "pod") {
+    endpointPanel.hidden = true;
+    submitModeTitle.textContent = "Local pod execution";
+    submitModeCopy.textContent =
+      "This pod submits the generated workflow straight to the local ComfyUI node. No endpoint URL, no bearer token, no cargo cult.";
+    submitButton.textContent = "Run in Pod";
+    return;
+  }
+
+  endpointPanel.hidden = false;
+  submitModeTitle.textContent = "Real endpoint";
+  submitModeCopy.innerHTML =
+    'Full POST URL, for example <code>https://api.runpod.ai/v2/&lt;endpoint_id&gt;/runsync</code>';
+  submitButton.textContent = "Submit to Endpoint";
 }
 
 function setFile(file) {
@@ -137,7 +159,7 @@ function renderResponse(result) {
   const chips = [
     result.ok ? `HTTP ${result.status_code} ok` : `HTTP ${result.status_code}`,
     result.content_type,
-    result.endpoint_url,
+    result.endpoint_url || "local ComfyUI",
   ];
 
   responseSummary.innerHTML = "";
@@ -162,10 +184,13 @@ async function initializeConfig() {
 
   const config = await response.json();
   state.fps = config.fps;
+  state.runMode = config.run_mode || "worker";
+  state.submissionMode = config.submission_mode || "endpoint";
   secondsField.min = String(config.seconds.min);
   secondsField.max = String(config.seconds.max);
   secondsField.step = String(config.seconds.step);
   secondsField.value = String(config.seconds.default);
+  updateSubmitModeUi();
   updateDurationSummary();
 }
 
@@ -282,35 +307,45 @@ submitButton.addEventListener("click", async () => {
   setFeedback("");
 
   const endpointUrl = endpointUrlField.value.trim();
-  if (!endpointUrl) {
+  if (state.submissionMode === "endpoint" && !endpointUrl) {
     setFeedback("Endpoint URL is required before submit.", "error");
     endpointUrlField.focus();
     return;
   }
 
   submitButton.disabled = true;
-  submitButton.textContent = "Submitting...";
+  submitButton.textContent = state.submissionMode === "pod" ? "Running..." : "Submitting...";
 
   try {
     const payload = await buildPayload({
       scroll: false,
-      successMessage: "Payload refreshed for submit.",
+      successMessage:
+        state.submissionMode === "pod"
+          ? "Payload refreshed for local execution."
+          : "Payload refreshed for submit.",
     });
     if (!payload) {
       return;
     }
 
-    const response = await fetch("/api/submit", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        endpoint_url: endpointUrl,
-        auth_token: authTokenField.value,
-        payload,
-      }),
-    });
+    const response = await fetch(
+      state.submissionMode === "pod" ? "/api/pod-submit" : "/api/submit",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          payload,
+          ...(state.submissionMode === "endpoint"
+            ? {
+                endpoint_url: endpointUrl,
+                auth_token: authTokenField.value,
+              }
+            : {}),
+        }),
+      }
+    );
 
     const result = await response.json();
     if (!response.ok) {
@@ -321,15 +356,19 @@ submitButton.addEventListener("click", async () => {
     responsePanel.scrollIntoView({ behavior: "smooth", block: "start" });
     setFeedback(
       result.ok
-        ? `Submitted successfully. Endpoint returned HTTP ${result.status_code}.`
-        : `Submitted. Endpoint returned HTTP ${result.status_code}.`,
+        ? state.submissionMode === "pod"
+          ? "Local pod run finished successfully."
+          : `Submitted successfully. Endpoint returned HTTP ${result.status_code}.`
+        : state.submissionMode === "pod"
+          ? `Local pod run returned HTTP ${result.status_code}.`
+          : `Submitted. Endpoint returned HTTP ${result.status_code}.`,
       result.ok ? "success" : "error"
     );
   } catch (error) {
     setFeedback(error.message, "error");
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = "Submit to Endpoint";
+    updateSubmitModeUi();
   }
 });
 
