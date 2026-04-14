@@ -28,6 +28,7 @@ ROOT_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
 COMFY_NODES = os.environ.get("COMFY_NODES", "127.0.0.1:8188").split(",")
 COMFY_INPUT_DIR = os.environ.get("COMFY_INPUT_DIR", "/comfyui/input")
+LOCAL_COMFY_NODE = os.environ.get("LOCAL_COMFY_NODE", "127.0.0.1:8188").strip()
 
 app = FastAPI(title="LTX 2.3 Payload Builder")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
@@ -73,6 +74,12 @@ def get_run_mode() -> str:
 
 def get_submission_mode() -> str:
     return "pod" if get_run_mode() == "pod" else "endpoint"
+
+
+def get_pod_submit_node() -> str:
+    if not LOCAL_COMFY_NODE:
+        raise RuntimeError("LOCAL_COMFY_NODE is not configured.")
+    return LOCAL_COMFY_NODE
 
 
 def prepare_pod_images(
@@ -265,10 +272,11 @@ async def submit_payload_in_pod(request: PodSubmitRequest) -> dict[str, object]:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    target_node = COMFY_NODES[0].strip()
-    if not target_node:
+    try:
+        target_node = get_pod_submit_node()
+    except RuntimeError as exc:
         cleanup_input_files(written_input_files)
-        raise HTTPException(status_code=500, detail="COMFY_NODES is not configured.")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     timeout = aiohttp.ClientTimeout(total=request.timeout_seconds)
 

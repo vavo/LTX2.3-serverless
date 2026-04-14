@@ -59,8 +59,6 @@ start_local_redis() {
     esac
 }
 
-start_local_redis
-
 # Start SSH server if PUBLIC_KEY is set (enables remote access and dev-sync.sh)
 if [ -n "${PUBLIC_KEY:-}" ]; then
     mkdir -p ~/.ssh
@@ -155,6 +153,12 @@ case "${RUN_MODE}" in
 esac
 
 echo "worker-comfyui: Selected RUN_MODE=${RUN_MODE}"
+
+if [ "${RUN_MODE}" != "pod" ]; then
+    start_local_redis
+else
+    echo "worker-comfyui: Skipping Redis bootstrap in pod mode"
+fi
 
 start_comfyui() {
     local listen_mode="$1"

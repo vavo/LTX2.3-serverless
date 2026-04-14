@@ -12,13 +12,14 @@ This document outlines the environment variables available for configuring the w
 | `PERSIST_WORKSPACE`  | When `true`, persist ComfyUI, the Python venv, caches, and downloaded assets under `/workspace` (which aliases `/runpod-volume` on serverless).                                                                            | `true`  |
 | `WORKSPACE_ROOT`     | Override the detected persistent workspace root. Useful only if your mount layout differs from RunPod defaults.                                                                                                              | auto    |
 | `WORKSPACE_STATE_ROOT` | Override the state directory inside the persistent workspace.                                                                                                                         | `/workspace/worker-comfyui` |
-| `HUGGINGFACE_ACCESS_TOKEN` | Optional token used for startup downloads and other Hugging Face fetches.                                                                                                      | –       |
+| `HUGGINGFACE_ACCESS_TOKEN` | Optional token used for startup downloads and other Hugging Face fetches. `HF_TOKEN` and `HUGGINGFACE_TOKEN` are also accepted aliases by the preload script.                 | –       |
 | `LTX23_PRELOAD_VARIANT` | Optional LTX checkpoint preload at worker startup: `distilled`, `dev`, `distilled-fp8`, or `dev-fp8`.                                                                     | empty   |
 | `LTX23_PRELOAD_UPSCALERS` | When `true`, also preload the official LTX latent upscalers and distilled LoRA for the two-stage path.                                                                  | `false` |
 | `COMFYUI_MANAGER_CONFIG` | Override the ComfyUI-Manager `config.ini` path used by `comfy-manager-set-mode`.                                                                                             | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
 | `INDRO_API_KEY` | Secret checked only by the legacy custom `input.prompt` + `input.image_url` handler path. Workflow-mode jobs do not use it. | `dev_token_123` |
 | `REDIS_URL` | Redis connection used for rate limiting, dedupe, job status, and circuit breaker state. | `redis://localhost:6379` |
 | `COMFY_NODES` | Comma-separated ComfyUI API hosts that can accept `/prompt` and `/history` requests. | `127.0.0.1:8188` |
+| `LOCAL_COMFY_NODE` | Local ComfyUI host used by the bundled frontend for pod-mode submits. | `127.0.0.1:8188` |
 | `COMFY_INPUT_DIR` | Directory where workflow-mode uploaded input files are staged before queueing the workflow. | `/comfyui/input` |
 | `COMFY_OUTPUT_DIR` | Directory where generated images and videos are read back from after completion. | `/comfyui/output` |
 | `MAX_INLINE_VIDEO_MB` | Maximum inline base64 video size. Larger video responses require S3 or they fail. | `50` |
@@ -31,6 +32,32 @@ This document outlines the environment variables available for configuring the w
 When multiple workers share the same persisted `/workspace`, the bootstrap now uses a shared lock at `/workspace/worker-comfyui/.bootstrap.lock` while seeding the persisted ComfyUI root and Python virtualenv.
 
 That prevents concurrent first-boot workers from trampling the same shared venv. If a worker dies while holding the lock, stale-lock cleanup will eventually remove it.
+
+## Recommended First Boot
+
+For the least annoying first worker boot on RunPod serverless, set:
+
+```env
+PERSIST_WORKSPACE=true
+RUN_MODE=worker
+COMFY_NODES=127.0.0.1:8188
+LTX23_PRELOAD_VARIANT=distilled
+LTX23_PRELOAD_UPSCALERS=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
+
+For a plain pod:
+
+```env
+PERSIST_WORKSPACE=true
+RUN_MODE=pod
+LOCAL_COMFY_NODE=127.0.0.1:8188
+LTX23_PRELOAD_VARIANT=distilled
+LTX23_PRELOAD_UPSCALERS=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
+
+That startup preload covers the main LTX checkpoint, the official latent upscalers, and the distilled LoRA. Some secondary weights used by `ComfyUI-LTXVideo`, such as Gemma or text encoders, can still download on first render into the persistent Hugging Face cache.
 
 ## Runtime Paths
 

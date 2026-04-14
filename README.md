@@ -82,9 +82,37 @@ This repo optimizes the boring part:
 5. Set at least:
    - `PERSIST_WORKSPACE=true`
    - `LTX23_PRELOAD_VARIANT=distilled`
+   - `LTX23_PRELOAD_UPSCALERS=true`
+   - `HUGGINGFACE_ACCESS_TOKEN=<your_hf_read_token>`
 6. Export your ComfyUI workflow with `Workflow > Export (API)`.
 7. Send it to `/run` or `/runsync`.
 8. If you scale beyond one worker on a shared network volume, the startup bootstrap now serializes ComfyUI/venv seeding with a shared lock under `/workspace/worker-comfyui/.bootstrap.lock`.
+
+## Recommended First Boot Env
+
+For a sane first boot on RunPod serverless, use:
+
+```env
+PERSIST_WORKSPACE=true
+RUN_MODE=worker
+COMFY_NODES=127.0.0.1:8188
+LTX23_PRELOAD_VARIANT=distilled
+LTX23_PRELOAD_UPSCALERS=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
+
+For a plain pod instead of a serverless worker:
+
+```env
+PERSIST_WORKSPACE=true
+RUN_MODE=pod
+LOCAL_COMFY_NODE=127.0.0.1:8188
+LTX23_PRELOAD_VARIANT=distilled
+LTX23_PRELOAD_UPSCALERS=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
+
+This preloads the main LTX checkpoint plus the official latent upscalers and distilled LoRA into persistent storage. Some secondary assets, especially Gemma and text-encoder weights used by `ComfyUI-LTXVideo`, may still download on first render through Hugging Face cache. Because apparently one startup path was not enough.
 
 ## Runtime Modes
 
@@ -171,6 +199,7 @@ Treat that mode as legacy. It exists so old callers do not explode on contact, n
 | `INDRO_API_KEY` | Secret expected only by the legacy custom prompt/image_url path |
 | `REDIS_URL` | Redis connection for queue telemetry, rate limiting, dedupe, and circuit breaker state |
 | `COMFY_NODES` | Comma-separated ComfyUI API hosts the worker can route jobs to |
+| `LOCAL_COMFY_NODE` | Local ComfyUI host used by the bundled frontend when `RUN_MODE=pod` |
 | `COMFY_INPUT_DIR` | Where uploaded workflow input files are staged before queueing |
 | `COMFY_OUTPUT_DIR` | Where generated Comfy artifacts are read back from |
 | `AWS_BUCKET_NAME` | Enable S3 upload mode for image and video outputs |

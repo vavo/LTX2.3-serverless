@@ -35,6 +35,21 @@ This is the simplest method if the official images meet your needs.
   - (optional) Advanced: Attach a Network Volume under `Select Network Volume`. For this repo that is not really optional unless you like paying cold-start tax on every worker boot. See the [Customization Guide](customization.md#method-2-network-volume-alternative-for-models) and [Network Volumes & Model Paths](network-volumes.md).
   - For serverless endpoints, leave `RUN_MODE` unset or set it explicitly to `worker`.
 
+### Recommended first-boot env
+
+Use this for a sane first worker boot:
+
+```env
+PERSIST_WORKSPACE=true
+RUN_MODE=worker
+COMFY_NODES=127.0.0.1:8188
+LTX23_PRELOAD_VARIANT=distilled
+LTX23_PRELOAD_UPSCALERS=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
+
+That preloads the main LTX model stack into persistent storage. Secondary assets used by `ComfyUI-LTXVideo`, especially Gemma and text-encoder weights, may still fetch on the first render and then stay cached under `/workspace/worker-comfyui/cache/huggingface`.
+
 - Click `deploy`
 - Your endpoint will be created. You can click on it to view the dashboard and find its ID.
 
@@ -117,3 +132,14 @@ RUN_MODE=pod
 ```
 
 That starts ComfyUI and the bundled frontend, but skips `runpod.serverless.start(...)`.
+
+For a sane first pod boot, use:
+
+```env
+PERSIST_WORKSPACE=true
+RUN_MODE=pod
+LOCAL_COMFY_NODE=127.0.0.1:8188
+LTX23_PRELOAD_VARIANT=distilled
+LTX23_PRELOAD_UPSCALERS=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
