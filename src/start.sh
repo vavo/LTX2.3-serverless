@@ -123,17 +123,31 @@ echo "worker-comfyui: Starting ComfyUI"
 
 # PID file used by the handler to detect if ComfyUI is still running
 COMFY_PID_FILE="/tmp/comfyui.pid"
+FRONTEND_PID_FILE="/tmp/ltx-frontend.pid"
+
+start_frontend() {
+    if [ "${LTX_FRONTEND_ENABLED:-true}" != "true" ]; then
+        echo "worker-comfyui: Frontend disabled"
+        return
+    fi
+
+    echo "worker-comfyui: Starting LTX frontend on :7777"
+    python -m uvicorn frontend_app:app --host 0.0.0.0 --port 7777 &
+    echo $! > "$FRONTEND_PID_FILE"
+}
 
 # Serve the API and don't shutdown the container
 if [ "${SERVE_API_LOCALLY:-false}" == "true" ]; then
     python -u /comfyui/main.py --disable-auto-launch --disable-metadata --listen --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
     echo $! > "$COMFY_PID_FILE"
+    start_frontend
 
     echo "worker-comfyui: Starting RunPod Handler"
     python -u /handler.py --rp_serve_api --rp_api_host=0.0.0.0
 else
     python -u /comfyui/main.py --disable-auto-launch --disable-metadata --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
     echo $! > "$COMFY_PID_FILE"
+    start_frontend
 
     echo "worker-comfyui: Starting RunPod Handler"
     python -u /handler.py
