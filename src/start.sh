@@ -124,6 +124,56 @@ echo "worker-comfyui: Starting ComfyUI"
 # PID file used by the handler to detect if ComfyUI is still running
 COMFY_PID_FILE="/tmp/comfyui.pid"
 FRONTEND_PID_FILE="/tmp/ltx-frontend.pid"
+COMFY_PID=""
+FRONTEND_PID=""
+
+cleanup_background_processes() {
+    for pid in "${FRONTEND_PID:-}" "${COMFY_PID:-}"; do
+        if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+            kill "${pid}" 2>/dev/null || true
+        fi
+    done
+}
+
+trap cleanup_background_processes EXIT INT TERM
+
+if [ -z "${RUN_MODE:-}" ]; then
+    if [ "${SERVE_API_LOCALLY:-false}" == "true" ]; then
+        RUN_MODE="local-api"
+    else
+        RUN_MODE="worker"
+    fi
+fi
+
+case "${RUN_MODE}" in
+    worker|local-api|pod)
+        ;;
+    *)
+        echo "worker-comfyui: Unsupported RUN_MODE=${RUN_MODE}. Use worker, local-api, or pod." >&2
+        exit 1
+        ;;
+esac
+
+echo "worker-comfyui: Selected RUN_MODE=${RUN_MODE}"
+
+start_comfyui() {
+    local listen_mode="$1"
+    local comfy_args=(
+        python -u /comfyui/main.py
+        --disable-auto-launch
+        --disable-metadata
+        --verbose "${COMFY_LOG_LEVEL}"
+        --log-stdout
+    )
+
+    if [ "${listen_mode}" == "true" ]; then
+        comfy_args+=(--listen)
+    fi
+
+    "${comfy_args[@]}" &
+    COMFY_PID="$!"
+    echo "${COMFY_PID}" > "$COMFY_PID_FILE"
+}
 
 start_frontend() {
     if [ "${LTX_FRONTEND_ENABLED:-true}" != "true" ]; then
@@ -133,22 +183,46 @@ start_frontend() {
 
     echo "worker-comfyui: Starting LTX frontend on :7777"
     python -m uvicorn frontend_app:app --host 0.0.0.0 --port 7777 &
-    echo $! > "$FRONTEND_PID_FILE"
+    FRONTEND_PID="$!"
+    echo "${FRONTEND_PID}" > "$FRONTEND_PID_FILE"
 }
 
-# Serve the API and don't shutdown the container
-if [ "${SERVE_API_LOCALLY:-false}" == "true" ]; then
-    python -u /comfyui/main.py --disable-auto-launch --disable-metadata --listen --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
-    echo $! > "$COMFY_PID_FILE"
-    start_frontend
+wait_for_pod_services() {
+    local pids=()
+    if [ -n "${COMFY_PID}" ]; then
+        pids+=("${COMFY_PID}")
+    fi
+    if [ -n "${FRONTEND_PID}" ]; then
+        pids+=("${FRONTEND_PID}")
+    fi
 
-    echo "worker-comfyui: Starting RunPod Handler"
-    python -u /handler.py --rp_serve_api --rp_api_host=0.0.0.0
-else
-    python -u /comfyui/main.py --disable-auto-launch --disable-metadata --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
-    echo $! > "$COMFY_PID_FILE"
-    start_frontend
+    if [ "${#pids[@]}" -eq 0 ]; then
+        echo "worker-comfyui: No long-running services were started in pod mode." >&2
+        exit 1
+    fi
 
-    echo "worker-comfyui: Starting RunPod Handler"
-    python -u /handler.py
-fi
+    echo "worker-comfyui: Pod mode active; waiting on background services"
+    wait -n "${pids[@]}"
+}
+
+case "${RUN_MODE}" in
+    local-api)
+        start_comfyui true
+        start_frontend
+
+        echo "worker-comfyui: Starting RunPod Handler in local API mode"
+        python -u /handler.py --rp_serve_api --rp_api_host=0.0.0.0
+        ;;
+    pod)
+        start_comfyui true
+        start_frontend
+        wait_for_pod_services
+        ;;
+    worker)
+        start_comfyui false
+        start_frontend
+
+        echo "worker-comfyui: Starting RunPod Handler in worker mode"
+        python -u /handler.py
+        ;;
+esac

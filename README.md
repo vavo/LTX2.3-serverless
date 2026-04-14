@@ -86,6 +86,19 @@ This repo optimizes the boring part:
 7. Send it to `/run` or `/runsync`.
 8. If you scale beyond one worker on a shared network volume, the startup bootstrap now serializes ComfyUI/venv seeding with a shared lock under `/workspace/worker-comfyui/.bootstrap.lock`.
 
+## Runtime Modes
+
+The container now supports explicit runtime modes via `RUN_MODE`:
+
+- `worker`: default serverless worker behavior, starts ComfyUI, the frontend, and `runpod.serverless.start(...)`
+- `local-api`: starts ComfyUI, the frontend, and the local RunPod-style API on port `8000`
+- `pod`: starts ComfyUI and the frontend only, without the serverless handler
+
+If `RUN_MODE` is unset, the image stays backward compatible:
+
+- `SERVE_API_LOCALLY=true` maps to `RUN_MODE=local-api`
+- otherwise it falls back to `RUN_MODE=worker`
+
 ## API Contract Today
 
 ### Input
@@ -174,6 +187,7 @@ The full list lives in [docs/configuration.md](./docs/configuration.md).
 - ComfyUI model directories are mapped from `/workspace/models/...` via `/comfyui/extra_model_paths.yaml`. On serverless that is the same storage as `/runpod-volume/models/...`.
 - The current handler uses `/comfyui/input` and `/comfyui/output` by default.
 - The local/container frontend auto-starts on port `7777` unless `LTX_FRONTEND_ENABLED=false`.
+- For pod deployments, set `RUN_MODE=pod` so the container does not launch the serverless handler.
 - ComfyUI-Manager configuration lives at `/comfyui/user/default/ComfyUI-Manager/config.ini` unless `COMFYUI_MANAGER_CONFIG` overrides it.
 - LTX image targets install `ComfyUI-LTXVideo` from Lightricks.
 - The startup bootstrap can seed ComfyUI and the venv into persistent storage on first run.

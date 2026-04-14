@@ -112,8 +112,8 @@ For enhanced local development and end-to-end testing, you can start a local env
 **Steps:**
 
 1.  **Set Environment Variable (Optional but Recommended):**
-    - While the `docker-compose.yml` sets `SERVE_API_LOCALLY=true` by default, you might manage environment variables externally (e.g., via a `.env` file).
-    - Ensure the `SERVE_API_LOCALLY` environment variable is set to `true` for the `worker` service if you modify the compose file or use an `.env` file.
+    - While the `docker-compose.yml` currently sets `SERVE_API_LOCALLY=true` by default, the cleaner setting is `RUN_MODE=local-api`.
+    - If you modify the compose file or use an `.env` file, prefer setting `RUN_MODE=local-api` explicitly.
 2.  **Start the services**:
     ```bash
     # From the project root directory
@@ -132,6 +132,21 @@ For enhanced local development and end-to-end testing, you can start a local env
 
 - The bundled payload-builder frontend auto-starts in the same container and is accessible at: [http://localhost:7777](http://localhost:7777)
 - You can disable it by setting `LTX_FRONTEND_ENABLED=false` if you only want the worker and ComfyUI.
+
+## Pod-Oriented Local Boot
+
+If you want to simulate a plain pod rather than the local RunPod API shim, set:
+
+```bash
+RUN_MODE=pod
+```
+
+That starts:
+
+- ComfyUI on `8188`
+- the frontend on `7777`
+
+and skips the serverless handler entirely.
 
 ### Access Local ComfyUI
 

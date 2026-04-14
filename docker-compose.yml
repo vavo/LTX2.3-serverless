@@ -10,7 +10,7 @@ services:
               count: all
               capabilities: [gpu]
     environment:
-      - SERVE_API_LOCALLY=true
+      - RUN_MODE=local-api
     ports:
       - "8000:8000"
       - "8188:8188"

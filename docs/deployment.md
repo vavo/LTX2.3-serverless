@@ -33,6 +33,7 @@ This is the simplest method if the official images meet your needs.
   - Flash Boot: `enabled` (Recommended for faster worker startup).
   - Select Template: `ltx2.3-worker` (or the name you gave your template).
   - (optional) Advanced: Attach a Network Volume under `Select Network Volume`. For this repo that is not really optional unless you like paying cold-start tax on every worker boot. See the [Customization Guide](customization.md#method-2-network-volume-alternative-for-models) and [Network Volumes & Model Paths](network-volumes.md).
+  - For serverless endpoints, leave `RUN_MODE` unset or set it explicitly to `worker`.
 
 - Click `deploy`
 - Your endpoint will be created. You can click on it to view the dashboard and find its ID.
@@ -106,3 +107,13 @@ RunPod offers a seamless way to deploy directly from your GitHub repository cont
 5.  **Deploy:** RunPod will clone the repository, build the image from your specified branch and Dockerfile, push it to a temporary registry, and deploy the endpoint.
 
 Every `git push` to the configured branch will automatically trigger a new build and update your RunPod endpoint. For more details, refer to the [RunPod GitHub Integration Documentation](https://docs.runpod.io/serverless/github-integration).
+
+## Using the Image in a Pod
+
+If you use this image for a plain pod instead of a serverless worker, set:
+
+```bash
+RUN_MODE=pod
+```
+
+That starts ComfyUI and the bundled frontend, but skips `runpod.serverless.start(...)`.
