@@ -1,16 +1,28 @@
 .DS_Store
+.DS_Store?
 venv
+.venv
+env
 .env
+.env.*
+!.env.example
 data
 models
 simulated_uploaded
-__pycache__
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 node_modules
 .buildx-cache/
 
 # Python/test junk
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 
 # Editor noise
@@ -22,3 +34,7 @@ htmlcov/
 core
 core.*
 .buildx-cache-new/
+
+# OS / local runtime junk
+Thumbs.db
+*.pid
