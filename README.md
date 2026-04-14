@@ -26,6 +26,7 @@ Less boot drama. More actual inference.
 - RunPod serverless worker around ComfyUI.
 - Persistent state on `/workspace` via network volume.
 - LTX-focused image targets:
+  - `<repo>:<version>-base`
   - `<repo>:<version>-ltx2.3-distilled-cu128`
   - `<repo>:<version>-ltx2.3-distilled-fp8-cu128`
   - `<repo>:<version>-ltx2.3-distilled-cu130`
@@ -56,15 +57,17 @@ This repo optimizes the boring part:
 
 | Target | Use Case |
 | --- | --- |
+| `base` | Default clean CUDA 12.8 / cu128 base image |
 | `ltx2-3-distilled` | Default target for CUDA 12.8 deployments |
 | `ltx2-3-distilled-fp8` | Lower VRAM pressure with the FP8 distilled checkpoint |
 | `ltx2-3-distilled-cuda13` | Experimental CUDA 13 path for newer Blackwell-oriented stacks |
-| `base-cuda12-8-1` | Clean CUDA 12.8 base image for custom LTX builds |
+| `base-cuda12-8-1` | Explicit CUDA 12.8 base image alias for custom LTX builds |
 | `base-cuda13-0` | Clean CUDA 13 base image for custom experimental builds |
 
 ## Hardware Baseline
 
 - CUDA 12.8 is the default target in this repo.
+- Plain `docker build ...` and bake target `base` now default to CUDA 12.8.1 with the cu128 PyTorch wheel index.
 - CUDA 13 is supported here as an experimental path.
 - The LTX / ComfyUI docs recommend 32GB+ VRAM and 100GB+ free disk for a comfortable setup.
 - For the CUDA 12.8 path, PyTorch 2.8+ is the intended floor.
@@ -170,6 +173,7 @@ The full list lives in [docs/configuration.md](./docs/configuration.md).
 - Shared bootstrap seeding is guarded by `/workspace/worker-comfyui/.bootstrap.lock` so multiple workers do not try to initialize the same persisted venv at once.
 - ComfyUI model directories are mapped from `/workspace/models/...` via `/comfyui/extra_model_paths.yaml`. On serverless that is the same storage as `/runpod-volume/models/...`.
 - The current handler uses `/comfyui/input` and `/comfyui/output` by default.
+- The local/container frontend auto-starts on port `7777` unless `LTX_FRONTEND_ENABLED=false`.
 - ComfyUI-Manager configuration lives at `/comfyui/user/default/ComfyUI-Manager/config.ini` unless `COMFYUI_MANAGER_CONFIG` overrides it.
 - LTX image targets install `ComfyUI-LTXVideo` from Lightricks.
 - The startup bootstrap can seed ComfyUI and the venv into persistent storage on first run.

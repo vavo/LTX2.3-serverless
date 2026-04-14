@@ -12,7 +12,7 @@ This is the simplest method if the official images meet your needs.
 - In the dialog, configure:
   - Template Name: `ltx2.3-worker` (or your preferred name)
   - Template Type: serverless (change template type to "serverless")
-  - Container Image: Use one of the LTX-oriented tags from the main [README.md](../README.md#available-docker-images), for example `<repo>:<version>-ltx2.3-distilled-cu128`.
+  - Container Image: Use one of the LTX-oriented tags from the main [README.md](../README.md#available-docker-images), for example `<repo>:<version>-ltx2.3-distilled-cu128`. If you are building your own clean base, plain `base` now defaults to CUDA 12.8.1 / cu128.
   - Container Registry Credentials: Leave as default (images are public).
   - Container Disk: Adjust based on the chosen image tag, see [GPU Recommendations](#gpu-recommendations).
   - (optional) Environment Variables: Configure `LTX23_PRELOAD_VARIANT`, `HUGGINGFACE_ACCESS_TOKEN`, S3, or other settings (see [Configuration Guide](configuration.md)).
@@ -41,10 +41,11 @@ This is the simplest method if the official images meet your needs.
 
 | Target                           | Image Tag Suffix              | Minimum VRAM Required | Recommended Container Size |
 | -------------------------------- | ----------------------------- | --------------------- | -------------------------- |
+| Clean base, default CUDA 12.8    | `base`                        | N/A                   | 20 GB                      |
 | LTX 2.3 distilled                | `ltx2.3-distilled-cu128`      | 32 GB                 | 100 GB                     |
 | LTX 2.3 distilled fp8            | `ltx2.3-distilled-fp8-cu128`  | 24-32 GB              | 100 GB                     |
 | LTX 2.3 distilled, experimental  | `ltx2.3-distilled-cu130`      | 32 GB                 | 100 GB                     |
-| CUDA 12.8 clean base             | `base-cuda12.8.1`             | N/A                   | 20 GB                      |
+| CUDA 12.8 clean base, explicit alias | `base-cuda12.8.1`         | N/A                   | 20 GB                      |
 | CUDA 13 clean base               | `base-cuda13.0`               | N/A                   | 20 GB                      |
 
 _Note: Container sizes are approximate and assume a network volume for persistent state. Without a network volume, you will need more local disk and much more patience._

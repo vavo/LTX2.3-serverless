@@ -23,6 +23,7 @@ This document outlines the environment variables available for configuring the w
 | `MAX_INLINE_VIDEO_MB` | Maximum inline base64 video size. Larger video responses require S3 or they fail. | `50` |
 | `CACHE_TTL_SECONDS` | How long successful deduped responses stay cached in Redis. | `604800` |
 | `AWS_BUCKET_NAME` | Enable S3 upload mode for generated image and video outputs. | – |
+| `LTX_FRONTEND_ENABLED` | When `true`, starts the bundled FastAPI frontend inside the container on port `7777`. | `true` |
 
 ## Bootstrap Locking
 

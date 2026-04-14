@@ -120,13 +120,18 @@ For enhanced local development and end-to-end testing, you can start a local env
     docker-compose up --build
     ```
     - The `--build` flag ensures the image is built locally using the current state of the code and `Dockerfile`.
-    - This will start two containers: `comfyui` and `worker`.
+    - This will start the worker container, which in turn starts ComfyUI, the local RunPod API shim, and the bundled frontend.
 
 ### Access the Local Worker API
 
 - With the Docker Compose stack running, the worker's simulated RunPod API is accessible at: [http://localhost:8000](http://localhost:8000)
 - You can send POST requests to `http://localhost:8000/run` or `http://localhost:8000/runsync` with the same JSON payload structure expected by the RunPod endpoint.
 - Opening [http://localhost:8000/docs](http://localhost:8000/docs) in your browser will show the FastAPI auto-generated documentation (Swagger UI), allowing you to interact with the API directly.
+
+### Access the Local Frontend
+
+- The bundled payload-builder frontend auto-starts in the same container and is accessible at: [http://localhost:7777](http://localhost:7777)
+- You can disable it by setting `LTX_FRONTEND_ENABLED=false` if you only want the worker and ComfyUI.
 
 ### Access Local ComfyUI
 
