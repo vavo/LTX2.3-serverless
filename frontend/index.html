@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LTX 2.3 Payload Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <main class="app-shell">
+        <section class="hero">
+          <p class="eyebrow">LTX 2.3 payload builder</p>
+          <h1>What will you imagine?</h1>
+          <p class="hero-copy">
+            Generate the JSON body for the LTX image-to-video API without doing
+            frame math by hand like a prisoner.
+          </p>
+        </section>
+
+        <section class="mode-toggle" aria-label="Generation mode">
+          <button class="mode-pill" type="button" disabled>
+            Text to Video
+            <span class="soon-chip">Soon</span>
+          </button>
+          <button class="mode-pill mode-pill-active" type="button">
+            Image to Video
+          </button>
+        </section>
+
+        <form id="payload-form" class="controls" novalidate>
+          <section class="prompt-panel panel">
+            <label class="floating-label" for="prompt">Prompt</label>
+            <textarea
+              id="prompt"
+              name="prompt"
+              maxlength="1000"
+              placeholder="Describe your scene in detail... e.g. 'A futuristic cyberpunk city at neon golden hour, cinematic panning shot, 8k resolution'"
+              required
+            ></textarea>
+            <div class="panel-footer">
+              <label class="checkbox">
+                <input id="optimize-prompt" name="optimize-prompt" type="checkbox" checked />
+                <span>Optimize with AI</span>
+              </label>
+              <span class="counter"><span id="char-count">0</span> / 1000 characters</span>
+            </div>
+          </section>
+
+          <div class="secondary-grid">
+            <section
+              id="upload-panel"
+              class="panel upload-panel"
+              tabindex="0"
+              role="button"
+              aria-controls="source-image"
+            >
+              <input id="source-image" type="file" accept="image/*" hidden />
+              <div class="upload-icon" aria-hidden="true">↥</div>
+              <p class="upload-title">Add Source Image</p>
+              <p class="upload-copy">Drag and drop or click to upload</p>
+              <div id="file-pill" class="file-pill" hidden>
+                <span id="file-name"></span>
+              </div>
+            </section>
+
+            <section class="panel settings-panel">
+              <div class="setting-block">
+                <div class="setting-row">
+                  <span class="setting-label">Duration</span>
+                  <span class="setting-value"><span id="seconds-value">5.0</span>s</span>
+                </div>
+                <input
+                  id="seconds"
+                  name="seconds"
+                  type="range"
+                  min="1"
+                  max="10"
+                  step="0.5"
+                  value="5"
+                />
+                <div class="range-markers">
+                  <span>1s</span>
+                  <span>5s</span>
+                  <span>10s</span>
+                </div>
+              </div>
+
+              <div class="setting-divider"></div>
+
+              <div class="setting-block">
+                <div class="setting-row">
+                  <span class="setting-label">Aspect Ratio</span>
+                  <span class="setting-meta" id="resolution-value">1280 × 720</span>
+                </div>
+                <div class="aspect-grid" role="radiogroup" aria-label="Aspect ratio">
+                  <button class="aspect-button aspect-button-active" data-aspect-ratio="16:9" type="button">
+                    16:9
+                  </button>
+                  <button class="aspect-button" data-aspect-ratio="9:16" type="button">
+                    9:16
+                  </button>
+                  <button class="aspect-button" data-aspect-ratio="1:1" type="button">
+                    1:1
+                  </button>
+                </div>
+              </div>
+
+              <div class="metrics-row">
+                <div class="metric-chip">
+                  <span class="metric-label">Frames</span>
+                  <span class="metric-value" id="frames-value">121</span>
+                </div>
+                <div class="metric-chip">
+                  <span class="metric-label">FPS</span>
+                  <span class="metric-value" id="fps-value">24</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="panel endpoint-panel">
+            <div class="endpoint-header">
+              <div>
+                <p class="payload-label">Submit</p>
+                <h2>Real endpoint</h2>
+              </div>
+              <p class="endpoint-copy">
+                Full POST URL, for example
+                <code>https://api.runpod.ai/v2/&lt;endpoint_id&gt;/runsync</code>
+              </p>
+            </div>
+            <div class="endpoint-grid">
+              <label class="field-group">
+                <span class="field-label">Endpoint URL</span>
+                <input
+                  id="endpoint-url"
+                  name="endpoint-url"
+                  type="url"
+                  placeholder="https://api.runpod.ai/v2/your-endpoint-id/runsync"
+                />
+              </label>
+              <label class="field-group">
+                <span class="field-label">Bearer Token</span>
+                <input
+                  id="auth-token"
+                  name="auth-token"
+                  type="password"
+                  placeholder="RunPod API key"
+                  autocomplete="off"
+                />
+              </label>
+            </div>
+          </section>
+
+          <div class="actions">
+            <button id="generate-button" class="primary-action" type="submit">
+              Generate Payload
+            </button>
+            <button id="submit-button" class="secondary-hero-action" type="button">
+              Submit to Endpoint
+            </button>
+            <p class="helper-copy">
+              Output matches the worker workflow contract: `input.workflow` plus optional `input.images`.
+            </p>
+          </div>
+        </form>
+
+        <section id="feedback" class="feedback" aria-live="polite"></section>
+
+        <section id="payload-panel" class="payload-panel panel" hidden>
+          <div class="payload-header">
+            <div>
+              <p class="payload-label">Payload Preview</p>
+              <h2>API request body</h2>
+            </div>
+            <div class="payload-actions">
+              <button id="copy-button" class="secondary-action" type="button">Copy JSON</button>
+              <button id="download-button" class="secondary-action" type="button">Download</button>
+            </div>
+          </div>
+          <div id="payload-summary" class="payload-summary"></div>
+          <pre id="payload-output"></pre>
+        </section>
+
+        <section id="response-panel" class="payload-panel panel" hidden>
+          <div class="payload-header">
+            <div>
+              <p class="payload-label">Response</p>
+              <h2>Endpoint result</h2>
+            </div>
+          </div>
+          <div id="response-summary" class="payload-summary"></div>
+          <pre id="response-output"></pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

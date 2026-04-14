@@ -6,3 +6,5 @@ requests
 aiohttp
 redis
 boto3
+fastapi
+uvicorn[standard]

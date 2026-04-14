@@ -33,15 +33,14 @@ Less boot drama. More actual inference.
   - `<repo>:<version>-base-cuda13.0`
 - Standard RunPod endpoints: `/run`, `/runsync`, `/health`.
 - Input workflow JSON plus optional input images.
-- Output handling for image outputs from ComfyUI.
+- Output handling for image and video artifacts from ComfyUI.
+- Checked-in LTX image-to-video API workflow at [`video_ltx2_3_i2v_API.json`](./video_ltx2_3_i2v_API.json).
 
-### Not true yet
+### Compatibility baggage
 
-- This repo does **not** currently return video or audio artifacts in the API response.
-- The handler currently collects `output.images` only. If your workflow emits `SaveVideo`, `CreateVideo`, audio, or other non-image outputs, those outputs are not returned by the API yet.
-- There is no checked-in canonical LTX API sample workflow in the repo yet.
-
-If you want proper video-file responses, that is a handler feature still waiting for its promotion.
+- The worker still accepts the older custom request shape based on `input.prompt`, `input.image_url`, and `input.api_key`.
+- New integrations should use the workflow contract below instead of building against the legacy compatibility path.
+- The worker currently returns image and video files only. Audio-only artifacts are still not exposed as a first-class output collection.
 
 ## Why It Wins
 
@@ -92,26 +91,27 @@ The worker accepts:
 
 - `input.workflow`: required ComfyUI API workflow JSON
 - `input.images`: optional list of base64-encoded input images
-- `input.comfy_org_api_key`: optional per-request Comfy.org API key
+- `input.priority`: optional queue hint, `standard` by default and `vip` for the legacy custom path
 
 ### Output
 
 The worker currently returns:
 
 - `output.images[]` when the workflow produces image outputs
-- optional `output.errors[]` for non-fatal warnings
+- `output.videos[]` when the workflow produces video outputs
 
-Image entries look like this:
+Artifact entries look like this:
 
 ```json
 {
-  "filename": "ComfyUI_00001_.png",
+  "filename": "LTX_2.3_i2v.mp4",
   "type": "base64",
-  "data": "iVBORw0KGgoAAAANSUhEUg..."
+  "data": "AAAAIGZ0eXBpc29tAAACAGlzb20uLi4=",
+  "media_type": "video/mp4"
 }
 ```
 
-If S3 is configured, `type` becomes `s3_url`.
+If S3 is configured, `type` becomes `url` and `data` is a presigned URL.
 
 ## Minimal Request Example
 
@@ -119,9 +119,28 @@ If S3 is configured, `type` becomes `s3_url`.
 curl -X POST \
   -H "Authorization: Bearer <runpod_api_key>" \
   -H "Content-Type: application/json" \
-  -d '{"input":{"workflow":{... your Comfy API workflow ...}}}' \
+  -d '{"input":{"workflow":{... your Comfy API workflow ...},"images":[{"name":"source.png","image":"data:image/png;base64,..." }]}}' \
   https://api.runpod.ai/v2/<endpoint_id>/runsync
 ```
+
+## Legacy Compatibility Mode
+
+The checked-in frontend and the primary docs target the workflow contract above.
+
+The worker still accepts the older compatibility payload below for existing clients:
+
+```json
+{
+  "input": {
+    "api_key": "your-worker-secret",
+    "prompt": "your prompt",
+    "image_url": "https://example.com/source.png",
+    "priority": "standard"
+  }
+}
+```
+
+Treat that mode as legacy. It exists so old callers do not explode on contact, not because it is the API you should build new things around.
 
 ## Environment Variables That Matter
 
@@ -133,8 +152,14 @@ curl -X POST \
 | `LTX23_PRELOAD_VARIANT` | Preload `distilled`, `dev`, `distilled-fp8`, or `dev-fp8` |
 | `LTX23_PRELOAD_UPSCALERS` | Also preload the official LTX latent upscalers and distilled LoRA |
 | `HUGGINGFACE_ACCESS_TOKEN` | Optional Hugging Face token for startup downloads |
-| `COMFY_ORG_API_KEY` | Optional Comfy.org API key |
-| `BUCKET_ENDPOINT_URL` | Enable S3 upload mode for image outputs |
+| `INDRO_API_KEY` | Secret expected only by the legacy custom prompt/image_url path |
+| `REDIS_URL` | Redis connection for queue telemetry, rate limiting, dedupe, and circuit breaker state |
+| `COMFY_NODES` | Comma-separated ComfyUI API hosts the worker can route jobs to |
+| `COMFY_INPUT_DIR` | Where uploaded workflow input files are staged before queueing |
+| `COMFY_OUTPUT_DIR` | Where generated Comfy artifacts are read back from |
+| `AWS_BUCKET_NAME` | Enable S3 upload mode for image and video outputs |
+| `MAX_INLINE_VIDEO_MB` | Max inline base64 video size before the worker forces S3 or errors |
+| `CACHE_TTL_SECONDS` | Deduped success-response cache retention |
 
 The full list lives in [docs/configuration.md](./docs/configuration.md).
 
@@ -148,6 +173,7 @@ The full list lives in [docs/configuration.md](./docs/configuration.md).
 - ComfyUI-Manager configuration lives at `/comfyui/user/default/ComfyUI-Manager/config.ini` unless `COMFYUI_MANAGER_CONFIG` overrides it.
 - LTX image targets install `ComfyUI-LTXVideo` from Lightricks.
 - The startup bootstrap can seed ComfyUI and the venv into persistent storage on first run.
+- Uploaded workflow input images are staged under per-job subfolders inside `/comfyui/input` and cleaned up after execution.
 - The current local `test_input.json` is legacy and not an LTX example.
 
 ## Docs

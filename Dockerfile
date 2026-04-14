@@ -101,7 +101,7 @@ RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     fi
 
 # Add application code and scripts
-ADD src/start.sh src/bootstrap_workspace.sh src/bootstrap_ltx23.sh src/network_volume.py handler.py video_ltx2_3_i2v_API.json ./
+ADD src/start.sh src/bootstrap_workspace.sh src/bootstrap_ltx23.sh src/network_volume.py handler.py video_ltx2_3_i2v_API.json test_input.json ./
 RUN chmod +x /start.sh
 RUN chmod +x /bootstrap_workspace.sh
 RUN chmod +x /bootstrap_ltx23.sh

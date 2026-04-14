@@ -29,11 +29,12 @@ This document outlines the key operational and structural conventions for the pr
 
 ## 3. API Interaction
 
-- **Input Structure:** API calls to the `/run` or `/runsync` endpoints must adhere to the JSON structure specified in the `README.md` ("API specification"). The primary key is `input`, containing `workflow` (mandatory object) and `images` (optional array).
+- **Primary Input Structure:** API calls to the `/run` or `/runsync` endpoints should use the workflow contract documented in the `README.md`. The primary key is `input`, containing `workflow` (mandatory object) and `images` (optional array).
 - **Image Encoding:** Input images provided in the `input.images` array must be base64 encoded strings (optionally including a `data:[<mediatype>];base64,` prefix).
 - **Workflow Format:** The `input.workflow` object should contain the JSON exported from ComfyUI using the "Save (API Format)" option (requires enabling "Dev mode Options" in ComfyUI settings).
-- **Output Structure:** Successful responses contain an `output.images` field, which is a **list of dictionaries**. Each dictionary includes `filename` (string), `type` (`"s3_url"` or `"base64"`), and `data` (string containing the URL or base64 data). Refer to the `README.md` API examples for the exact structure.
-- **Internal Communication:** Job status monitoring uses the ComfyUI websocket API instead of HTTP polling for efficiency.
+- **Output Structure:** Successful workflow responses can contain `output.images` and `output.videos`. Each entry includes `filename`, `type` (`"url"` or `"base64"`), `data`, and `media_type`.
+- **Legacy Compatibility:** The handler still accepts the older `input.prompt` + `input.image_url` request shape, but that is compatibility ballast. Do not build new integrations around it.
+- **Internal Communication:** The current handler polls ComfyUI `/history/{prompt_id}` over HTTP until outputs are ready.
 
 ## 4. Error Handling
 
