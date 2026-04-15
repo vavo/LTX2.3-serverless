@@ -6,6 +6,48 @@ bootstrap_log() {
     echo "worker-comfyui: $*"
 }
 
+describe_directory_size() {
+    local target_dir="$1"
+    du -sh "${target_dir}" 2>/dev/null | awk '{print $1}' || printf 'unknown-size'
+}
+
+run_with_progress_logs() {
+    local label="$1"
+    local target_dir="$2"
+    shift 2
+
+    local heartbeat_seconds="${BOOTSTRAP_PROGRESS_HEARTBEAT_SECONDS:-15}"
+    local start_ts
+    local heartbeat_pid=""
+    start_ts="$(date +%s)"
+
+    (
+        while true; do
+            sleep "${heartbeat_seconds}"
+            bootstrap_log "${label} still in progress for ${target_dir}..."
+        done
+    ) &
+    heartbeat_pid="$!"
+
+    "$@"
+    local exit_code=$?
+
+    kill "${heartbeat_pid}" 2>/dev/null || true
+    wait "${heartbeat_pid}" 2>/dev/null || true
+
+    if [ "${exit_code}" -ne 0 ]; then
+        return "${exit_code}"
+    fi
+
+    local end_ts
+    local elapsed_seconds
+    local final_size
+    end_ts="$(date +%s)"
+    elapsed_seconds="$((end_ts - start_ts))"
+    final_size="$(describe_directory_size "${target_dir}")"
+    bootstrap_log "${label} finished in ${elapsed_seconds}s (${final_size})"
+}
+
 ensure_workspace_alias() {
     if [ ! -e /workspace ] && [ -d /runpod-volume ]; then
         ln -s /runpod-volume /workspace
@@ -119,6 +161,7 @@ seed_directory_if_missing() {
     local target_dir="$2"
     local label="$3"
     local marker_file="${target_dir}/.worker-seeded"
+    local source_size
 
     if [ -f "${marker_file}" ]; then
         bootstrap_log "Using persisted ${label} at ${target_dir}"
@@ -129,10 +172,13 @@ seed_directory_if_missing() {
         reset_incomplete_seed_directory "${target_dir}" "${label}"
     fi
 
-    bootstrap_log "Seeding ${label} into ${target_dir}"
+    source_size="$(describe_directory_size "${source_dir}")"
+    bootstrap_log "Seeding ${label} into ${target_dir} from ${source_dir} (${source_size})"
     mkdir -p "${target_dir}"
-    cp -a "${source_dir}/." "${target_dir}/"
+    run_with_progress_logs "Seeding ${label}" "${target_dir}" \
+        cp -a "${source_dir}/." "${target_dir}/"
     touch "${marker_file}"
+    bootstrap_log "${label} seed marked complete"
 }
 
 replace_with_symlink() {

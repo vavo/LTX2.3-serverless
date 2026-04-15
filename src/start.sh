@@ -6,6 +6,7 @@ source /bootstrap_workspace.sh
 bootstrap_workspace
 source /bootstrap_ltx23.sh
 bootstrap_ltx23
+echo "worker-comfyui: Bootstrap complete; starting runtime services"
 
 start_local_redis() {
     export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
