@@ -78,6 +78,8 @@ function updateAspectButtons() {
 function updateSubmitModeUi() {
   if (state.submissionMode === "pod") {
     endpointPanel.hidden = true;
+    endpointUrlField.disabled = true;
+    authTokenField.disabled = true;
     submitModeTitle.textContent = "Local pod execution";
     submitModeCopy.textContent =
       "This pod submits the generated workflow straight to the local ComfyUI node. No endpoint URL, no bearer token, no cargo cult.";
@@ -86,6 +88,8 @@ function updateSubmitModeUi() {
   }
 
   endpointPanel.hidden = false;
+  endpointUrlField.disabled = false;
+  authTokenField.disabled = false;
   submitModeTitle.textContent = "Real endpoint";
   submitModeCopy.innerHTML =
     'Full POST URL, for example <code>https://api.runpod.ai/v2/&lt;endpoint_id&gt;/runsync</code>';
@@ -306,7 +310,11 @@ form.addEventListener("submit", async (event) => {
 submitButton.addEventListener("click", async () => {
   setFeedback("");
 
-  const endpointUrl = endpointUrlField.value.trim();
+  let endpointUrl = "";
+  if (state.submissionMode === "endpoint") {
+    endpointUrl = endpointUrlField.value.trim();
+  }
+
   if (state.submissionMode === "endpoint" && !endpointUrl) {
     setFeedback("Endpoint URL is required before submit.", "error");
     endpointUrlField.focus();
