@@ -6,6 +6,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import aiohttp
 from fastapi import FastAPI, HTTPException
@@ -76,10 +77,22 @@ def get_submission_mode() -> str:
     return "pod" if get_run_mode() == "pod" else "endpoint"
 
 
-def get_pod_submit_node() -> str:
-    if not LOCAL_COMFY_NODE:
+def normalize_node_host(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
         raise RuntimeError("LOCAL_COMFY_NODE is not configured.")
-    return LOCAL_COMFY_NODE
+
+    if "://" in normalized:
+        parsed = urlsplit(normalized)
+        if not parsed.netloc:
+            raise RuntimeError(f"Invalid LOCAL_COMFY_NODE value: {value}")
+        normalized = parsed.netloc
+
+    return normalized.rstrip("/")
+
+
+def get_pod_submit_node() -> str:
+    return normalize_node_host(LOCAL_COMFY_NODE)
 
 
 def prepare_pod_images(
