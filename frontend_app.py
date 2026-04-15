@@ -13,6 +13,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
+from starlette.requests import Request
+from starlette.responses import Response
 
 from ltx_payload_builder import (
     ASPECT_RATIOS,
@@ -33,6 +35,16 @@ LOCAL_COMFY_NODE = os.environ.get("LOCAL_COMFY_NODE", "127.0.0.1:8188").strip()
 
 app = FastAPI(title="LTX 2.3 Payload Builder")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
+
+
+@app.middleware("http")
+async def disable_frontend_caching(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 
 class PayloadRequest(BaseModel):
@@ -299,12 +311,23 @@ async def submit_payload_in_pod(request: PodSubmitRequest) -> dict[str, object]:
                 f"http://{target_node}/prompt",
                 json={"prompt": prepared_workflow},
             ) as response:
-                prompt_response = await response.json()
+                raw_body = await response.text()
+                try:
+                    prompt_response = json.loads(raw_body)
+                except json.JSONDecodeError:
+                    prompt_response = {}
                 prompt_id = prompt_response.get("prompt_id")
                 if response.status >= 400 or not prompt_id:
+                    detail = "Local ComfyUI rejected the workflow submit."
+                    if isinstance(prompt_response, dict) and prompt_response:
+                        detail = prompt_response.get("message") or json.dumps(
+                            prompt_response
+                        )
+                    elif raw_body.strip():
+                        detail = raw_body.strip()
                     raise HTTPException(
                         status_code=502,
-                        detail="Local ComfyUI rejected the workflow submit.",
+                        detail=detail,
                     )
 
             history_entry = await wait_for_history(
