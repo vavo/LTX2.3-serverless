@@ -8,3 +8,4 @@ redis
 boto3
 fastapi
 uvicorn[standard]
+huggingface_hub[hf_transfer]>=0.30.0

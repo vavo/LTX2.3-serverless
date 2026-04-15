@@ -29,7 +29,7 @@ ltx_download() {
     local url="$1"
     local output_path="$2"
     local token="${3:-}"
-    local tmp_path="${output_path}.part"
+    local backend="${LTX23_DOWNLOAD_BACKEND:-auto}"
 
     mkdir -p "$(dirname "${output_path}")"
 
@@ -38,13 +38,88 @@ ltx_download() {
         return
     fi
 
-    ltx_log "Downloading ${url##*/} to ${output_path}"
+    case "${backend}" in
+        auto)
+            if python -c "import huggingface_hub" >/dev/null 2>&1; then
+                ltx_download_with_hf_hub "${url}" "${output_path}" "${token}"
+            else
+                ltx_download_with_wget "${url}" "${output_path}" "${token}"
+            fi
+            ;;
+        hf_hub)
+            ltx_download_with_hf_hub "${url}" "${output_path}" "${token}"
+            ;;
+        wget)
+            ltx_download_with_wget "${url}" "${output_path}" "${token}"
+            ;;
+        *)
+            ltx_log "Unsupported LTX23_DOWNLOAD_BACKEND='${backend}'"
+            exit 1
+            ;;
+    esac
+}
+
+ltx_download_with_wget() {
+    local url="$1"
+    local output_path="$2"
+    local token="${3:-}"
+    local tmp_path="${output_path}.part"
+
+    ltx_log "Downloading ${url##*/} to ${output_path} via wget"
     if [ -n "${token}" ]; then
         wget -nv -c --header="Authorization: Bearer ${token}" -O "${tmp_path}" "${url}"
     else
         wget -nv -c -O "${tmp_path}" "${url}"
     fi
     mv "${tmp_path}" "${output_path}"
+}
+
+ltx_download_with_hf_hub() {
+    local url="$1"
+    local output_path="$2"
+    local token="${3:-}"
+
+    export HF_HUB_ENABLE_HF_TRANSFER="${HF_HUB_ENABLE_HF_TRANSFER:-1}"
+    export LTX_DOWNLOAD_URL="${url}"
+    export LTX_DOWNLOAD_OUTPUT_PATH="${output_path}"
+    export LTX_DOWNLOAD_TOKEN="${token}"
+
+    ltx_log "Downloading ${url##*/} to ${output_path} via huggingface_hub (hf_transfer=${HF_HUB_ENABLE_HF_TRANSFER})"
+    python - <<'PY'
+import os
+import re
+from pathlib import Path
+
+from huggingface_hub import hf_hub_download
+
+url = os.environ["LTX_DOWNLOAD_URL"]
+output_path = Path(os.environ["LTX_DOWNLOAD_OUTPUT_PATH"])
+token = os.environ.get("LTX_DOWNLOAD_TOKEN") or None
+
+match = re.match(r"^https://huggingface\.co/([^/]+/[^/]+)/resolve/([^/]+)/(.+)$", url)
+if not match:
+    raise SystemExit(f"Unsupported Hugging Face resolve URL: {url}")
+
+repo_id, revision, filename = match.groups()
+output_path.parent.mkdir(parents=True, exist_ok=True)
+
+downloaded_path = Path(
+    hf_hub_download(
+        repo_id=repo_id,
+        filename=filename,
+        revision=revision,
+        token=token,
+        local_dir=str(output_path.parent),
+    )
+)
+
+if downloaded_path.resolve() != output_path.resolve():
+    downloaded_path.replace(output_path)
+PY
+
+    unset LTX_DOWNLOAD_URL
+    unset LTX_DOWNLOAD_OUTPUT_PATH
+    unset LTX_DOWNLOAD_TOKEN
 }
 
 ltx_checkpoint_url() {

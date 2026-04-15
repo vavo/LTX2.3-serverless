@@ -62,6 +62,7 @@ chmod +x "${BIN_DIR}/wget"
 (
     export PATH="${BIN_DIR}:${PATH}"
     export WGET_LOG_FILE="${WGET_LOG_FILE}"
+    export LTX23_DOWNLOAD_BACKEND="wget"
     export HUGGINGFACE_ACCESS_TOKEN="hf-test-token"
     export LTX23_PRELOAD_VARIANT="distilled"
     export LTX23_PRELOAD_UPSCALERS=true
@@ -99,6 +100,7 @@ done
 if (
     export PATH="${BIN_DIR}:${PATH}"
     export WGET_LOG_FILE="${WGET_LOG_FILE}"
+    export LTX23_DOWNLOAD_BACKEND="wget"
     export LTX23_PRELOAD_VARIANT="made-up-variant"
     source "${SCRIPT_TO_TEST}"
     bootstrap_ltx23 >/dev/null 2>&1

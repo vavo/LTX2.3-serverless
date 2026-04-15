@@ -195,6 +195,7 @@ Treat that mode as legacy. It exists so old callers do not explode on contact, n
 | `WORKSPACE_STATE_ROOT` | Override where worker state lives inside the persistent root |
 | `LTX23_PRELOAD_VARIANT` | Preload `distilled`, `dev`, `distilled-fp8`, or `dev-fp8` |
 | `LTX23_PRELOAD_UPSCALERS` | Also preload the official LTX latent upscalers and distilled LoRA |
+| `LTX23_DOWNLOAD_BACKEND` | LTX preload download backend: `auto` (default), `hf_hub`, or `wget` |
 | `HUGGINGFACE_ACCESS_TOKEN` | Optional Hugging Face token for startup downloads |
 | `INDRO_API_KEY` | Secret expected only by the legacy custom prompt/image_url path |
 | `REDIS_URL` | Redis connection for queue telemetry, rate limiting, dedupe, and circuit breaker state |
