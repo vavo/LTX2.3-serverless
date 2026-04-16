@@ -32,8 +32,7 @@ ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
 # Install Python, git and other necessary tools
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y \
+    apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3.12-venv \
     redis-server \
@@ -48,8 +47,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     openssh-server \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
     && ln -sf /usr/bin/pip3 /usr/bin/pip \
-    && apt-get autoremove -y \
-    && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create the virtualenv with Python.
