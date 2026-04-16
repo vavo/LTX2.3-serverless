@@ -62,9 +62,13 @@
               aria-controls="source-image"
             >
               <input id="source-image" type="file" accept="image/*" hidden />
-              <div class="upload-icon" aria-hidden="true">↥</div>
-              <p class="upload-title">Add Source Image</p>
-              <p class="upload-copy">Drag and drop or click to upload</p>
+              <div id="upload-icon" class="upload-icon" aria-hidden="true">↥</div>
+              <p id="upload-title" class="upload-title">Add Source Image</p>
+              <p id="upload-copy" class="upload-copy">Drag and drop or click to upload</p>
+              <div id="image-preview-card" class="image-preview-card" hidden>
+                <img id="image-preview" class="image-preview" alt="Uploaded source preview" />
+                <p id="preview-name" class="preview-name"></p>
+              </div>
               <div id="file-pill" class="file-pill" hidden>
                 <span id="file-name"></span>
               </div>
@@ -166,7 +170,7 @@
             <button id="submit-button" class="secondary-hero-action" type="button">
               Submit to Endpoint
             </button>
-            <p class="helper-copy">
+            <p id="helper-copy" class="helper-copy">
               Output matches the worker workflow contract: `input.workflow` plus optional `input.images`.
             </p>
           </div>

@@ -2,6 +2,7 @@ const state = {
   aspectRatio: "16:9",
   fps: 24,
   file: null,
+  filePreviewUrl: "",
   payload: null,
   payloadJson: "",
   runMode: "worker",
@@ -25,9 +26,15 @@ const resolutionValue = document.querySelector("#resolution-value");
 const charCount = document.querySelector("#char-count");
 const feedback = document.querySelector("#feedback");
 const uploadPanel = document.querySelector("#upload-panel");
+const uploadIcon = document.querySelector("#upload-icon");
+const uploadTitle = document.querySelector("#upload-title");
+const uploadCopy = document.querySelector("#upload-copy");
 const sourceImageInput = document.querySelector("#source-image");
 const filePill = document.querySelector("#file-pill");
 const fileName = document.querySelector("#file-name");
+const imagePreviewCard = document.querySelector("#image-preview-card");
+const imagePreview = document.querySelector("#image-preview");
+const previewName = document.querySelector("#preview-name");
 const payloadPanel = document.querySelector("#payload-panel");
 const payloadOutput = document.querySelector("#payload-output");
 const payloadSummary = document.querySelector("#payload-summary");
@@ -40,6 +47,7 @@ const endpointUrlField = document.querySelector("#endpoint-url");
 const authTokenField = document.querySelector("#auth-token");
 const submitModeTitle = document.querySelector("#submit-mode-title");
 const submitModeCopy = document.querySelector("#submit-mode-copy");
+const helperCopy = document.querySelector("#helper-copy");
 const responsePanel = document.querySelector("#response-panel");
 const responseSummary = document.querySelector("#response-summary");
 const responseOutput = document.querySelector("#response-output");
@@ -80,32 +88,62 @@ function updateSubmitModeUi() {
     endpointPanel.hidden = true;
     endpointUrlField.disabled = true;
     authTokenField.disabled = true;
-    submitModeTitle.textContent = "Local pod execution";
-    submitModeCopy.textContent =
-      "This pod submits the generated workflow straight to the local ComfyUI node. No endpoint URL, no bearer token, no cargo cult.";
-    submitButton.textContent = "Run in Pod";
+    generateButton.hidden = true;
+    generateButton.disabled = true;
+    generateButton.type = "button";
+    payloadPanel.hidden = true;
+    helperCopy.hidden = true;
+    submitButton.textContent = "Generate Video";
+    submitButton.classList.remove("secondary-hero-action");
+    submitButton.classList.add("primary-action");
     return;
   }
 
   endpointPanel.hidden = false;
   endpointUrlField.disabled = false;
   authTokenField.disabled = false;
+  generateButton.hidden = false;
+  generateButton.disabled = false;
+  generateButton.type = "submit";
+  helperCopy.hidden = false;
   submitModeTitle.textContent = "Real endpoint";
   submitModeCopy.innerHTML =
     'Full POST URL, for example <code>https://api.runpod.ai/v2/&lt;endpoint_id&gt;/runsync</code>';
   submitButton.textContent = "Submit to Endpoint";
+  submitButton.classList.remove("primary-action");
+  submitButton.classList.add("secondary-hero-action");
 }
 
 function setFile(file) {
+  if (state.filePreviewUrl) {
+    URL.revokeObjectURL(state.filePreviewUrl);
+    state.filePreviewUrl = "";
+  }
+
   state.file = file;
   if (!file) {
     filePill.hidden = true;
     fileName.textContent = "";
+    imagePreviewCard.hidden = true;
+    imagePreview.removeAttribute("src");
+    previewName.textContent = "";
+    uploadIcon.hidden = false;
+    uploadTitle.hidden = false;
+    uploadCopy.hidden = false;
+    uploadPanel.classList.remove("has-preview");
     return;
   }
 
   fileName.textContent = file.name;
-  filePill.hidden = false;
+  state.filePreviewUrl = URL.createObjectURL(file);
+  imagePreview.src = state.filePreviewUrl;
+  previewName.textContent = file.name;
+  imagePreviewCard.hidden = false;
+  uploadIcon.hidden = true;
+  uploadTitle.hidden = true;
+  uploadCopy.hidden = true;
+  uploadPanel.classList.add("has-preview");
+  filePill.hidden = true;
 }
 
 function readFileAsDataUrl(file) {
@@ -235,11 +273,13 @@ async function buildPayload({ scroll = true, successMessage = "Payload ready." }
   state.payloadJson = JSON.stringify(data.payload, null, 2);
   payloadOutput.textContent = state.payloadJson;
   renderSummary(data.summary);
-  payloadPanel.hidden = false;
-  if (scroll) {
+  payloadPanel.hidden = state.submissionMode === "pod";
+  if (scroll && state.submissionMode !== "pod") {
     payloadPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  setFeedback(successMessage, "success");
+  if (successMessage) {
+    setFeedback(successMessage, "success");
+  }
   return data.payload;
 }
 
@@ -292,6 +332,11 @@ uploadPanel.addEventListener("drop", (event) => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (state.submissionMode === "pod") {
+    submitButton.click();
+    return;
+  }
+
   setFeedback("");
 
   generateButton.disabled = true;
@@ -329,7 +374,7 @@ submitButton.addEventListener("click", async () => {
       scroll: false,
       successMessage:
         state.submissionMode === "pod"
-          ? "Payload refreshed for local execution."
+          ? ""
           : "Payload refreshed for submit.",
     });
     if (!payload) {
