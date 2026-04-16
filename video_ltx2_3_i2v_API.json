@@ -58,9 +58,9 @@
     }
   },
   "267:221": {
-    "inputs": {
-      "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"
-    },
+      "inputs": {
+        "ckpt_name": "LTX-Video/ltx-2.3-22b-dev-fp8.safetensors"
+      },
     "class_type": "LTXVAudioVAELoader",
     "_meta": {
       "title": "LTXV Audio VAE Loader"
@@ -154,10 +154,10 @@
     }
   },
   "267:232": {
-    "inputs": {
-      "lora_name": "ltx-2.3-22b-distilled-lora-384.safetensors",
-      "strength_model": 0.5,
-      "model": [
+      "inputs": {
+        "lora_name": "LTX-Video/ltx-2.3-22b-distilled-lora-384.safetensors",
+        "strength_model": 0.5,
+        "model": [
         "267:236",
         0
       ]
@@ -546,9 +546,9 @@
     }
   },
   "267:233": {
-    "inputs": {
-      "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
-    },
+      "inputs": {
+        "model_name": "LTX-Video/ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+      },
     "class_type": "LatentUpscaleModelLoader",
     "_meta": {
       "title": "Load Latent Upscale Model"
@@ -618,20 +618,20 @@
     }
   },
   "267:236": {
-    "inputs": {
-      "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors"
-    },
+      "inputs": {
+        "ckpt_name": "LTX-Video/ltx-2.3-22b-dev-fp8.safetensors"
+      },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
       "title": "Load Checkpoint"
     }
   },
   "267:243": {
-    "inputs": {
-      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors",
-      "ckpt_name": "ltx-2.3-22b-dev-fp8.safetensors",
-      "device": "default"
-    },
+      "inputs": {
+        "text_encoder": "split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors",
+        "ckpt_name": "LTX-Video/ltx-2.3-22b-dev-fp8.safetensors",
+        "device": "default"
+      },
     "class_type": "LTXAVTextEncoderLoader",
     "_meta": {
       "title": "LTXV Audio Text Encoder Loader"
@@ -690,10 +690,10 @@
     }
   },
   "267:272": {
-    "inputs": {
-      "lora_name": "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
-      "strength_model": 1,
-      "strength_clip": 1,
+      "inputs": {
+        "lora_name": "split_files/loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors",
+        "strength_model": 1,
+        "strength_clip": 1,
       "model": [
         "267:236",
         0
