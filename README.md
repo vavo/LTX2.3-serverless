@@ -218,7 +218,7 @@ The full list lives in [docs/configuration.md](./docs/configuration.md).
 - The current handler uses `/comfyui/input` and `/comfyui/output` by default.
 - The local/container frontend auto-starts on port `7777` unless `LTX_FRONTEND_ENABLED=false`.
 - For pod deployments, set `RUN_MODE=pod` so the container does not launch the serverless handler.
-- ComfyUI-Manager configuration lives at `/comfyui/user/default/ComfyUI-Manager/config.ini` unless `COMFYUI_MANAGER_CONFIG` overrides it.
+- ComfyUI-Manager is installed in the image by default, and its configuration lives at `/comfyui/user/default/ComfyUI-Manager/config.ini` unless `COMFYUI_MANAGER_CONFIG` overrides it.
 - LTX image targets install `ComfyUI-LTXVideo` from Lightricks.
 - The startup bootstrap can seed ComfyUI and the venv into persistent storage on first run.
 - Uploaded workflow input images are staged under per-job subfolders inside `/comfyui/input` and cleaned up after execution.

@@ -112,14 +112,6 @@ except Exception as e:
 fi
 echo "worker-comfyui: GPU available — $GPU_CHECK"
 
-# Ensure ComfyUI-Manager runs in offline network mode inside the container
-comfy-manager-set-mode offline || echo "worker-comfyui - Could not set ComfyUI-Manager network_mode" >&2
-
-echo "worker-comfyui: Starting ComfyUI"
-
-# Allow operators to tweak verbosity; default is DEBUG.
-: "${COMFY_LOG_LEVEL:=DEBUG}"
-
 # PID file used by the handler to detect if ComfyUI is still running
 COMFY_PID_FILE="/tmp/comfyui.pid"
 FRONTEND_PID_FILE="/tmp/ltx-frontend.pid"
@@ -161,8 +153,15 @@ else
     echo "worker-comfyui: Skipping Redis bootstrap in pod mode"
 fi
 
+# Ensure ComfyUI-Manager runs in offline network mode inside the container
+comfy-manager-set-mode offline || echo "worker-comfyui - Could not set ComfyUI-Manager network_mode" >&2
+
+# Allow operators to tweak verbosity; default is DEBUG.
+: "${COMFY_LOG_LEVEL:=DEBUG}"
+
 start_comfyui() {
     local listen_mode="$1"
+    echo "worker-comfyui: Starting ComfyUI"
     local comfy_args=(
         python -u /comfyui/main.py
         --disable-auto-launch

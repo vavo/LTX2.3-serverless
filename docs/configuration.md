@@ -16,7 +16,7 @@ This document outlines the environment variables available for configuring the w
 | `LTX23_PRELOAD_VARIANT` | Optional LTX checkpoint preload at worker startup: `distilled`, `dev`, `distilled-fp8`, or `dev-fp8`.                                                                     | empty   |
 | `LTX23_PRELOAD_UPSCALERS` | When `true`, also preload the official LTX latent upscalers and distilled LoRA for the two-stage path.                                                                  | `false` |
 | `LTX23_DOWNLOAD_BACKEND` | LTX preload download backend: `auto` (prefer `huggingface_hub` + `hf_transfer`), `hf_hub`, or `wget`.                                                                   | `auto`  |
-| `COMFYUI_MANAGER_CONFIG` | Override the ComfyUI-Manager `config.ini` path used by `comfy-manager-set-mode`.                                                                                             | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+| `COMFYUI_MANAGER_CONFIG` | Override the ComfyUI-Manager `config.ini` path used by `comfy-manager-set-mode`. ComfyUI-Manager is installed in the image by default.                                      | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
 | `INDRO_API_KEY` | Secret checked only by the legacy custom `input.prompt` + `input.image_url` handler path. Workflow-mode jobs do not use it. | `dev_token_123` |
 | `REDIS_URL` | Redis connection used for rate limiting, dedupe, job status, and circuit breaker state. | `redis://localhost:6379` |
 | `COMFY_NODES` | Comma-separated ComfyUI API hosts that can accept `/prompt` and `/history` requests. | `127.0.0.1:8188` |

@@ -16,6 +16,8 @@ ARG EXTRA_PYTHON_PACKAGES=""
 ARG EXTRA_PYTHON_INDEX_URL=""
 ARG INSTALL_LTX_VIDEO_NODES=false
 ARG LTX_VIDEO_REF=master
+ARG INSTALL_COMFYUI_MANAGER=true
+ARG COMFYUI_MANAGER_REF=main
 ARG LTX23_PRELOAD_VARIANT=""
 ARG LTX23_PRELOAD_UPSCALERS=false
 
@@ -110,6 +112,15 @@ RUN chmod +x /bootstrap_ltx23.sh
 # Add script to install custom nodes
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
+
+# Install ComfyUI-Manager by default so the runtime config line is not fiction.
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    if [ "${INSTALL_COMFYUI_MANAGER}" = "true" ]; then \
+      git clone --depth=1 --branch "${COMFYUI_MANAGER_REF}" https://github.com/ltdrdata/ComfyUI-Manager.git /comfyui/custom_nodes/ComfyUI-Manager && \
+      if [ -f /comfyui/custom_nodes/ComfyUI-Manager/requirements.txt ]; then \
+        python -m pip install -r /comfyui/custom_nodes/ComfyUI-Manager/requirements.txt; \
+      fi; \
+    fi
 
 # Prevent pip from asking for confirmation during uninstall steps in custom nodes
 ENV PIP_NO_INPUT=1
