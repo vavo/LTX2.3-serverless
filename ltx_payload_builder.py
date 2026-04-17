@@ -12,7 +12,7 @@ WORKFLOW_TEMPLATE_PATH = ROOT_DIR / "video_ltx2_3_i2v_API.json"
 
 FPS = 24
 SECONDS_MIN = 1.0
-SECONDS_MAX = 10.0
+SECONDS_MAX = 20.0
 SECONDS_STEP = 0.5
 
 ASPECT_RATIOS: dict[str, dict[str, int]] = {

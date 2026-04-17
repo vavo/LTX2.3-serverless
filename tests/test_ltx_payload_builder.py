@@ -8,6 +8,7 @@ class TestLtxPayloadBuilder(unittest.TestCase):
     def test_seconds_to_frames_uses_ltx_formula(self) -> None:
         self.assertEqual(seconds_to_frames(5), 121)
         self.assertEqual(seconds_to_frames(1), 25)
+        self.assertEqual(seconds_to_frames(20), 481)
 
     def test_build_payload_updates_workflow_template(self) -> None:
         payload = build_payload(
