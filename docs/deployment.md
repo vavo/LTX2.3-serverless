@@ -50,6 +50,33 @@ HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 
 That preloads the main LTX model stack into persistent storage. Secondary assets used by `ComfyUI-LTXVideo`, especially Gemma and text-encoder weights, may still fetch on the first render and then stay cached under `/workspace/worker-comfyui/cache/huggingface`.
 
+## Hardware Baseline
+
+- CUDA 12.8 is the default target in this repo.
+- Plain `docker build ...` and bake target `base` now default to CUDA 12.8.1 with the cu128 PyTorch wheel index.
+- CUDA 13 is supported here as an experimental path.
+- The LTX / ComfyUI docs recommend 32GB+ VRAM and 100GB+ free disk for a comfortable setup.
+- For the CUDA 12.8 path, PyTorch 2.8+ is the intended floor.
+- For the CUDA 13 path, official `cu130` wheels start at PyTorch 2.9+, so treat that lane accordingly.
+
+## Current Truth
+
+### Works Today
+
+- RunPod serverless worker around ComfyUI.
+- Persistent state on `/workspace` via network volume.
+- LTX-focused image targets as listed in the main [README.md](../README.md#available-docker-images).
+- Standard RunPod endpoints: `/run`, `/runsync`, `/health`.
+- Input workflow JSON plus optional input images.
+- Output handling for image and video artifacts from ComfyUI.
+- Checked-in LTX image-to-video API workflow at [`video_ltx2_3_i2v_API.json`](../video_ltx2_3_i2v_API.json).
+
+### Compatibility Baggage
+
+- The worker still accepts the older custom request shape based on `input.prompt`, `input.image_url`, and `input.api_key`.
+- New integrations should use the workflow contract documented in the main [README.md](../README.md#api-specification) instead of building against the legacy compatibility path.
+- The worker currently returns image and video files only. Audio-only artifacts are still not exposed as a first-class output collection.
+
 - Click `deploy`
 - Your endpoint will be created. You can click on it to view the dashboard and find its ID.
 

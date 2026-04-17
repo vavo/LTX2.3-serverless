@@ -175,5 +175,3 @@ Once you have resolved your issue, disable diagnostics to keep logs clean:
 - Set `NETWORK_VOLUME_DEBUG=false`
 
 This returns the worker to normal behavior without extra log noise.
-
-

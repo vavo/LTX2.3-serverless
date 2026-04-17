@@ -4,6 +4,24 @@ This project provides a way to run [ComfyUI](https://github.com/comfyanonymous/C
 
 It packages ComfyUI into Docker images, manages job handling via the `runpod` SDK, uses websockets for efficient communication with ComfyUI, and facilitates configuration through environment variables.
 
+## Why This Exists
+
+- Builds LTX-oriented Docker targets for RunPod serverless.
+- Uses Python 3.12 and a persistent `/workspace` bootstrap for ComfyUI, the venv, and caches.
+- Installs the official `ComfyUI-LTXVideo` nodes in the LTX image targets.
+- Targets CUDA 12.8 by default and CUDA 13 experimentally for newer Blackwell-oriented deployments.
+- Can preload the main LTX 2.3 checkpoint at startup into persistent storage.
+- Can also preload the official latent upscalers and distilled LoRA for the two-stage distilled path.
+
+## Why It Wins
+
+LTX 2.3 is interesting. Rebuilding Comfy, reinstalling nodes, and redownloading weights on every serverless boot is not.
+
+This repo optimizes the boring part:
+- Keep the expensive state on `/workspace`
+- Use a sane CUDA matrix for newer Nvidia cards
+- Make RunPod serverless usable for LTX workflows without turning deployment into a ritual
+
 # Project Conventions and Rules
 
 This document outlines the key operational and structural conventions for the project. While there are no strict code-style rules enforced by linters currently, following these conventions ensures consistency and smooth development/deployment.
