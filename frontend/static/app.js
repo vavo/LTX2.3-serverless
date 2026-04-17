@@ -20,6 +20,9 @@ const promptField = document.querySelector("#prompt");
 const optimizeField = document.querySelector("#optimize-prompt");
 const secondsField = document.querySelector("#seconds");
 const secondsValue = document.querySelector("#seconds-value");
+const secondsMinLabel = document.querySelector("#seconds-min-label");
+const secondsDefaultLabel = document.querySelector("#seconds-default-label");
+const secondsMaxLabel = document.querySelector("#seconds-max-label");
 const framesValue = document.querySelector("#frames-value");
 const fpsValue = document.querySelector("#fps-value");
 const resolutionValue = document.querySelector("#resolution-value");
@@ -68,6 +71,10 @@ function setFeedback(message, type = "") {
 
 function updatePromptCounter() {
   charCount.textContent = String(promptField.value.length);
+}
+
+function formatSecondsLabel(seconds) {
+  return `${Number(seconds).toString()}s`;
 }
 
 function updateDurationSummary() {
@@ -365,6 +372,9 @@ async function initializeConfig() {
   secondsField.max = String(config.seconds.max);
   secondsField.step = String(config.seconds.step);
   secondsField.value = String(config.seconds.default);
+  secondsMinLabel.textContent = formatSecondsLabel(config.seconds.min);
+  secondsDefaultLabel.textContent = formatSecondsLabel(config.seconds.default);
+  secondsMaxLabel.textContent = formatSecondsLabel(config.seconds.max);
   updateSubmitModeUi();
   updateDurationSummary();
 }
@@ -581,6 +591,7 @@ submitButton.addEventListener("click", async () => {
 
 updatePromptCounter();
 updateAspectButtons();
+setFile(null);
 initializeConfig().catch((error) => {
   setFeedback(error.message, "error");
 });
