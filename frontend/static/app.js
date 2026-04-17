@@ -50,8 +50,12 @@ const submitModeCopy = document.querySelector("#submit-mode-copy");
 const helperCopy = document.querySelector("#helper-copy");
 const responsePanel = document.querySelector("#response-panel");
 const responseSummary = document.querySelector("#response-summary");
+const responseStatus = document.querySelector("#response-status");
+const responseMedia = document.querySelector("#response-media");
 const responseOutput = document.querySelector("#response-output");
 const aspectButtons = document.querySelectorAll("[data-aspect-ratio]");
+const POD_STATUS_POLL_INTERVAL_MS = 2000;
+const POD_STATUS_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 function secondsToFrames(seconds) {
   return Math.round(seconds * state.fps) + 1;
@@ -96,6 +100,9 @@ function updateSubmitModeUi() {
     submitButton.textContent = "Generate Video";
     submitButton.classList.remove("secondary-hero-action");
     submitButton.classList.add("primary-action");
+    submitModeTitle.textContent = "Local pod";
+    submitModeCopy.textContent =
+      "The frontend queues the workflow into the local ComfyUI pod and then polls for completion.";
     return;
   }
 
@@ -112,6 +119,10 @@ function updateSubmitModeUi() {
   submitButton.textContent = "Submit to Endpoint";
   submitButton.classList.remove("primary-action");
   submitButton.classList.add("secondary-hero-action");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function setFile(file) {
@@ -212,10 +223,127 @@ function renderResponse(result) {
     responseSummary.appendChild(chip);
   });
 
-  responseOutput.textContent = result.response_json
-    ? JSON.stringify(result.response_json, null, 2)
-    : (result.response_text || "");
+  if (state.submissionMode === "pod") {
+    renderResponseMedia(result.response_json?.output || null);
+    renderPodStatus(result.response_json || {});
+    responseOutput.hidden = true;
+    responseOutput.textContent = "";
+  } else {
+    responseStatus.hidden = true;
+    responseStatus.textContent = "";
+    renderResponseMedia(null);
+    responseOutput.hidden = false;
+    responseOutput.textContent = result.response_json
+      ? JSON.stringify(result.response_json, null, 2)
+      : (result.response_text || "");
+  }
+
   responsePanel.hidden = false;
+}
+
+function renderPodStatus(responseJson) {
+  const status = responseJson?.status || "";
+  const hasOutput = Boolean(responseJson?.output);
+
+  if (hasOutput) {
+    responseStatus.hidden = true;
+    responseStatus.textContent = "";
+    return;
+  }
+
+  const statusCopy = {
+    queued: "Workflow queued locally.",
+    running: "ComfyUI is rendering the video.",
+    completed: "Render completed.",
+  };
+
+  responseStatus.textContent = statusCopy[status] || "Working on your video.";
+  responseStatus.hidden = false;
+}
+
+function renderResponseMedia(output) {
+  responseMedia.innerHTML = "";
+
+  if (!output || (!output.videos?.length && !output.images?.length)) {
+    responseMedia.hidden = true;
+    return;
+  }
+
+  const renderArtifactCard = (artifact, mediaKind) => {
+    const card = document.createElement("article");
+    card.className = "response-media-card";
+
+    const header = document.createElement("div");
+    header.className = "response-media-header";
+
+    const title = document.createElement("p");
+    title.className = "response-media-title";
+    title.textContent = artifact.filename;
+
+    const saveLink = document.createElement("a");
+    saveLink.className = "response-media-link";
+    saveLink.href = artifact.download_url || artifact.url;
+    saveLink.textContent = mediaKind === "video" ? "Save video" : "Save image";
+    saveLink.setAttribute("download", artifact.filename);
+
+    header.appendChild(title);
+    header.appendChild(saveLink);
+    card.appendChild(header);
+
+    if (mediaKind === "video") {
+      const video = document.createElement("video");
+      video.className = "response-video";
+      video.src = artifact.url;
+      video.controls = true;
+      video.preload = "metadata";
+      card.appendChild(video);
+    } else {
+      const image = document.createElement("img");
+      image.className = "response-image";
+      image.src = artifact.url;
+      image.alt = artifact.filename;
+      card.appendChild(image);
+    }
+
+    return card;
+  };
+
+  output.videos?.forEach((artifact) => {
+    responseMedia.appendChild(renderArtifactCard(artifact, "video"));
+  });
+
+  output.images?.forEach((artifact) => {
+    responseMedia.appendChild(renderArtifactCard(artifact, "image"));
+  });
+
+  responseMedia.hidden = false;
+}
+
+async function pollPodSubmitStatus(promptId, nodeUsed) {
+  const deadline = Date.now() + POD_STATUS_POLL_TIMEOUT_MS;
+  const statusUrl = new URL(`/api/pod-submit/${encodeURIComponent(promptId)}`, window.location.origin);
+  if (nodeUsed) {
+    statusUrl.searchParams.set("node", nodeUsed);
+  }
+
+  while (Date.now() < deadline) {
+    const response = await fetch(statusUrl);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || "Failed to poll local pod status.");
+    }
+
+    renderResponse(result);
+
+    if (result.response_json?.status === "completed") {
+      return result;
+    }
+
+    await sleep(POD_STATUS_POLL_INTERVAL_MS);
+  }
+
+  throw new Error("Local pod run timed out while waiting for ComfyUI history.");
 }
 
 async function initializeConfig() {
@@ -407,14 +535,30 @@ submitButton.addEventListener("click", async () => {
 
     renderResponse(result);
     responsePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    if (state.submissionMode === "pod") {
+      const promptId = result.response_json?.prompt_id || "";
+      const nodeUsed = result.response_json?.node_used || "";
+      if (!promptId) {
+        throw new Error("Local pod submit did not return a prompt_id.");
+      }
+
+      setFeedback("Workflow queued locally. Waiting for ComfyUI to finish.", "success");
+      submitButton.textContent = "Waiting for ComfyUI...";
+      const completedResult = await pollPodSubmitStatus(promptId, nodeUsed);
+      setFeedback(
+        completedResult.ok
+          ? "Local pod run finished successfully."
+          : `Local pod run returned HTTP ${completedResult.status_code}.`,
+        completedResult.ok ? "success" : "error"
+      );
+      return;
+    }
+
     setFeedback(
       result.ok
-        ? state.submissionMode === "pod"
-          ? "Local pod run finished successfully."
-          : `Submitted successfully. Endpoint returned HTTP ${result.status_code}.`
-        : state.submissionMode === "pod"
-          ? `Local pod run returned HTTP ${result.status_code}.`
-          : `Submitted. Endpoint returned HTTP ${result.status_code}.`,
+        ? `Submitted successfully. Endpoint returned HTTP ${result.status_code}.`
+        : `Submitted. Endpoint returned HTTP ${result.status_code}.`,
       result.ok ? "success" : "error"
     );
   } catch (error) {

@@ -23,6 +23,8 @@ EXTRA_MODEL_PATHS_FILE="${TEST_DIR}/extra_model_paths.yaml"
 mkdir -p "${IMAGE_COMFY}/models/checkpoints" "${IMAGE_VENV}/bin" "${RUNTIME_COMFY}" "${RUNTIME_VENV}"
 printf 'seeded comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'seeded venv\n' > "${IMAGE_VENV}/bin/python"
+mkdir -p "${IMAGE_COMFY}/custom_nodes/ComfyUI-Manager"
+printf 'manager present\n' > "${IMAGE_COMFY}/custom_nodes/ComfyUI-Manager/README.txt"
 
 run_persistent_bootstrap() {
     (
@@ -60,6 +62,7 @@ run_persistent_bootstrap
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded comfy"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 assert_file_contains "${EXTRA_MODEL_PATHS_FILE}" "base_path: ${WORKSPACE_ROOT}"
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager/README.txt" "manager present"
 
 for cache_dir in huggingface pip torch triton xdg; do
     [ -d "${WORKSPACE_ROOT}/worker-comfyui/cache/${cache_dir}" ] || {
@@ -75,6 +78,10 @@ run_persistent_bootstrap
 
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded comfy"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
+
+rm -rf "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager"
+run_persistent_bootstrap
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager/README.txt" "manager present"
 
 rm -f "${WORKSPACE_ROOT}/worker-comfyui/venv/.worker-seeded"
 mkdir -p "${WORKSPACE_ROOT}/worker-comfyui/venv/lib/python3.12/site-packages/einops"

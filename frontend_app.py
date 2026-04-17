@@ -6,7 +6,7 @@ import os
 import uuid
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 import aiohttp
 from fastapi import FastAPI, HTTPException
@@ -25,13 +25,20 @@ from ltx_payload_builder import (
     build_payload,
     seconds_to_frames,
 )
-from workflow_support import apply_input_filename_map, write_input_images
+from workflow_support import (
+    apply_input_filename_map,
+    build_output_path,
+    collect_output_entries,
+    guess_media_type,
+    write_input_images,
+)
 
 ROOT_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
 COMFY_NODES = os.environ.get("COMFY_NODES", "127.0.0.1:8188").split(",")
 COMFY_INPUT_DIR = os.environ.get("COMFY_INPUT_DIR", "/comfyui/input")
 LOCAL_COMFY_NODE = os.environ.get("LOCAL_COMFY_NODE", "127.0.0.1:8188").strip()
+POD_SUBMIT_INPUT_FILES: dict[str, list[str]] = {}
 
 app = FastAPI(title="LTX 2.3 Payload Builder")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
@@ -182,9 +189,97 @@ async def wait_for_history(
         await asyncio.sleep(2)
 
 
+def remember_pod_submit_files(prompt_id: str, filepaths: list[str]) -> None:
+    POD_SUBMIT_INPUT_FILES[prompt_id] = list(filepaths)
+
+
+def cleanup_tracked_pod_submit_files(prompt_id: str) -> None:
+    filepaths = POD_SUBMIT_INPUT_FILES.pop(prompt_id, [])
+    if filepaths:
+        cleanup_input_files(filepaths)
+
+
+async def fetch_history_once(
+    session: aiohttp.ClientSession,
+    target_node: str,
+    prompt_id: str,
+) -> dict[str, Any] | None:
+    async with session.get(f"http://{target_node}/history/{prompt_id}") as response:
+        history_data = await response.json()
+
+    if prompt_id in history_data:
+        return history_data[prompt_id]
+
+    return None
+
+
+def build_pod_output_payload(history_entry: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
+    entries = collect_output_entries(history_entry.get("outputs", {}))
+    output: dict[str, list[dict[str, str]]] = {"images": [], "videos": []}
+
+    for entry in entries:
+        media_type = guess_media_type(entry["filename"], entry["media_kind"])
+        query = urlencode(
+            {
+                "filename": entry["filename"],
+                "subfolder": entry.get("subfolder", ""),
+                "media_kind": entry["media_kind"],
+            }
+        )
+        download_query = urlencode(
+            {
+                "filename": entry["filename"],
+                "subfolder": entry.get("subfolder", ""),
+                "media_kind": entry["media_kind"],
+                "download": "1",
+            }
+        )
+        payload = {
+            "filename": entry["filename"],
+            "subfolder": entry.get("subfolder", ""),
+            "media_type": media_type,
+            "url": f"/api/comfy-output?{query}",
+            "download_url": f"/api/comfy-output?{download_query}",
+        }
+        collection = "images" if entry["media_kind"] == "image" else "videos"
+        output[collection].append(payload)
+
+    return {key: value for key, value in output.items() if value}
+
+
 @app.get("/", response_class=FileResponse)
 async def index() -> FileResponse:
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/api/comfy-output")
+async def get_comfy_output(
+    filename: str,
+    subfolder: str = "",
+    media_kind: str = "video",
+    download: bool = False,
+) -> FileResponse:
+    try:
+        output_path = build_output_path(
+            os.environ.get("COMFY_OUTPUT_DIR", "/comfyui/output"),
+            {
+                "filename": filename,
+                "subfolder": subfolder,
+                "media_kind": media_kind,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Generated output file not found.")
+
+    media_type = guess_media_type(filename, media_kind)
+    return FileResponse(
+        output_path,
+        media_type=media_type,
+        filename=filename if download else None,
+    )
 
 
 @app.get("/health")
@@ -329,31 +424,80 @@ async def submit_payload_in_pod(request: PodSubmitRequest) -> dict[str, object]:
                         status_code=502,
                         detail=detail,
                     )
-
-            history_entry = await wait_for_history(
-                session,
-                target_node,
-                prompt_id,
-                request.timeout_seconds,
-            )
-
+        remember_pod_submit_files(prompt_id, written_input_files)
         return {
             "ok": True,
-            "status_code": 200,
+            "status_code": 202,
             "content_type": "application/json",
             "response_json": {
                 "prompt_id": prompt_id,
                 "node_used": target_node,
-                "history": history_entry,
+                "status": "queued",
             },
             "response_text": None,
         }
     except TimeoutError as exc:
+        cleanup_input_files(written_input_files)
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except aiohttp.ClientError as exc:
+        cleanup_input_files(written_input_files)
         raise HTTPException(
             status_code=502,
             detail=f"Local ComfyUI request failed: {exc}",
         ) from exc
-    finally:
+    except HTTPException:
         cleanup_input_files(written_input_files)
+        raise
+    except Exception:
+        cleanup_input_files(written_input_files)
+        raise
+
+
+@app.get("/api/pod-submit/{prompt_id}")
+async def get_pod_submit_status(
+    prompt_id: str,
+    node: str = "",
+) -> dict[str, object]:
+    node_value = node.strip()
+    try:
+        target_node = normalize_node_host(node_value) if node_value else get_pod_submit_node()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    timeout = aiohttp.ClientTimeout(total=10)
+
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            history_entry = await fetch_history_once(session, target_node, prompt_id)
+    except aiohttp.ClientError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Local ComfyUI status request failed: {exc}",
+        ) from exc
+
+    if history_entry is None:
+        return {
+            "ok": True,
+            "status_code": 202,
+            "content_type": "application/json",
+            "response_json": {
+                "prompt_id": prompt_id,
+                "node_used": target_node,
+                "status": "running",
+            },
+            "response_text": None,
+        }
+
+    cleanup_tracked_pod_submit_files(prompt_id)
+    return {
+        "ok": True,
+        "status_code": 200,
+        "content_type": "application/json",
+        "response_json": {
+            "prompt_id": prompt_id,
+            "node_used": target_node,
+            "status": "completed",
+            "output": build_pod_output_payload(history_entry),
+        },
+        "response_text": None,
+    }

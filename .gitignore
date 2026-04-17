@@ -38,3 +38,6 @@ core.*
 # OS / local runtime junk
 Thumbs.db
 *.pid
+
+# Local planning docs
+docs/planning/004_refactor_plan.local.md

@@ -193,6 +193,32 @@ replace_with_symlink() {
     ln -s "${target_path}" "${source_path}"
 }
 
+sync_directory_entries_if_missing() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local label="$3"
+    local entry=""
+    local entry_name=""
+
+    if [ ! -d "${source_dir}" ]; then
+        return
+    fi
+
+    mkdir -p "${target_dir}"
+
+    for entry in "${source_dir}"/*; do
+        [ -e "${entry}" ] || continue
+        entry_name="$(basename "${entry}")"
+
+        if [ -e "${target_dir}/${entry_name}" ]; then
+            continue
+        fi
+
+        bootstrap_log "Syncing image-baked ${label} ${entry_name} into persisted workspace"
+        cp -a "${entry}" "${target_dir}/${entry_name}"
+    done
+}
+
 write_extra_model_paths() {
     local base_path="$1"
     local output_file="${2:-/comfyui/extra_model_paths.yaml}"
@@ -263,6 +289,10 @@ bootstrap_workspace() {
 
     seed_directory_if_missing "${comfy_image_root}" "${comfy_root}" "ComfyUI root"
     seed_directory_if_missing "${venv_image_root}" "${venv_root}" "Python virtualenv"
+    sync_directory_entries_if_missing \
+        "${comfy_image_root}/custom_nodes" \
+        "${comfy_root}/custom_nodes" \
+        "custom node"
 
     trap - RETURN
     release_bootstrap_lock "${bootstrap_lock_dir}"
