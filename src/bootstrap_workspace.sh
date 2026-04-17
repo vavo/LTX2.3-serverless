@@ -290,6 +290,29 @@ sync_custom_nodes_from_image() {
     done
 }
 
+sync_named_files_from_image() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local file_list="$3"
+    local entry_name=""
+
+    [ -n "${file_list}" ] || return
+    [ -d "${source_dir}" ] || return
+
+    mkdir -p "${target_dir}"
+
+    IFS=',' read -r -a workflow_entries <<< "${file_list}"
+    for entry_name in "${workflow_entries[@]}"; do
+        entry_name="${entry_name#"${entry_name%%[![:space:]]*}"}"
+        entry_name="${entry_name%"${entry_name##*[![:space:]]}"}"
+        [ -n "${entry_name}" ] || continue
+        [ -f "${source_dir}/${entry_name}" ] || continue
+
+        bootstrap_log "Refreshing image-baked workflow ${entry_name} in persisted workspace"
+        cp -f "${source_dir}/${entry_name}" "${target_dir}/${entry_name}"
+    done
+}
+
 write_extra_model_paths() {
     local base_path="$1"
     local output_file="${2:-/comfyui/extra_model_paths.yaml}"
@@ -321,6 +344,9 @@ bootstrap_workspace() {
     local venv_image_root="${VENV_IMAGE_ROOT:-/opt/venv}"
     local venv_runtime_root="${VENV_RUNTIME_ROOT:-/opt/venv}"
     local extra_model_paths_file="${EXTRA_MODEL_PATHS_FILE:-${comfy_runtime_root}/extra_model_paths.yaml}"
+    local workflow_template_source_root="${WORKFLOW_TEMPLATE_SOURCE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    local workflow_target_dir_rel="${COMFY_WORKFLOW_TARGET_DIR:-user/default/workflows}"
+    local workflow_target_dir=""
 
     if [ "${PERSIST_WORKSPACE:-true}" != "true" ]; then
         bootstrap_log "Workspace persistence disabled"
@@ -345,6 +371,7 @@ bootstrap_workspace() {
     local venv_root="${state_root}/venv"
     local cache_root="${state_root}/cache"
     local bootstrap_lock_dir="${state_root}/.bootstrap.lock"
+    workflow_target_dir="${comfy_root}/${workflow_target_dir_rel}"
 
     mkdir -p \
         "${state_root}" \
@@ -363,6 +390,10 @@ bootstrap_workspace() {
     sync_custom_nodes_from_image \
         "${comfy_image_root}/custom_nodes" \
         "${comfy_root}/custom_nodes"
+    sync_named_files_from_image \
+        "${workflow_template_source_root}" \
+        "${workflow_target_dir}" \
+        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_3_i2v_API.json}"
 
     trap - RETURN
     release_bootstrap_lock "${bootstrap_lock_dir}"

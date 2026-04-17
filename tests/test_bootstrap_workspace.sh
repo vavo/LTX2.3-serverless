@@ -15,14 +15,16 @@ trap 'rm -rf "${TEST_DIR}"' EXIT
 
 IMAGE_COMFY="${TEST_DIR}/image-comfy"
 IMAGE_VENV="${TEST_DIR}/image-venv"
+IMAGE_APP="${TEST_DIR}/image-app"
 RUNTIME_COMFY="${TEST_DIR}/runtime-comfy"
 RUNTIME_VENV="${TEST_DIR}/runtime-venv"
 WORKSPACE_ROOT="${TEST_DIR}/workspace"
 EXTRA_MODEL_PATHS_FILE="${TEST_DIR}/extra_model_paths.yaml"
 
-mkdir -p "${IMAGE_COMFY}/models/checkpoints" "${IMAGE_VENV}/bin" "${RUNTIME_COMFY}" "${RUNTIME_VENV}"
+mkdir -p "${IMAGE_COMFY}/models/checkpoints" "${IMAGE_VENV}/bin" "${IMAGE_APP}" "${RUNTIME_COMFY}" "${RUNTIME_VENV}"
 printf 'seeded comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'seeded venv\n' > "${IMAGE_VENV}/bin/python"
+printf '{\"workflow\":\"seeded\"}\n' > "${IMAGE_APP}/video_ltx2_3_i2v_API.json"
 mkdir -p "${IMAGE_COMFY}/custom_nodes/comfyui-manager"
 mkdir -p "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader"
 printf 'manager present\n' > "${IMAGE_COMFY}/custom_nodes/comfyui-manager/README.txt"
@@ -38,6 +40,7 @@ run_persistent_bootstrap() {
         export VENV_IMAGE_ROOT="${IMAGE_VENV}"
         export VENV_RUNTIME_ROOT="${RUNTIME_VENV}"
         export EXTRA_MODEL_PATHS_FILE="${EXTRA_MODEL_PATHS_FILE}"
+        export WORKFLOW_TEMPLATE_SOURCE_ROOT="${IMAGE_APP}"
 
         source "${SCRIPT_TO_TEST}"
         bootstrap_workspace
@@ -66,6 +69,7 @@ assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded 
 assert_file_contains "${EXTRA_MODEL_PATHS_FILE}" "base_path: ${WORKSPACE_ROOT}"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager/README.txt" "manager present"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader present"
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_3_i2v_API.json" "\"workflow\":\"seeded\""
 
 for cache_dir in huggingface pip torch triton xdg; do
     [ -d "${WORKSPACE_ROOT}/worker-comfyui/cache/${cache_dir}" ] || {
@@ -78,6 +82,7 @@ printf 'mutated comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'mutated venv\n' > "${IMAGE_VENV}/bin/python"
 printf 'manager updated\n' > "${IMAGE_COMFY}/custom_nodes/comfyui-manager/README.txt"
 printf 'downloader updated\n' > "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader/README.txt"
+printf '{\"workflow\":\"updated\"}\n' > "${IMAGE_APP}/video_ltx2_3_i2v_API.json"
 
 run_persistent_bootstrap
 
@@ -85,6 +90,7 @@ assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded 
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager/README.txt" "manager updated"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader updated"
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_3_i2v_API.json" "\"workflow\":\"updated\""
 
 mkdir -p "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager"
 printf 'legacy manager\n' > "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager/README.txt"
