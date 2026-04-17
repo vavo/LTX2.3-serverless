@@ -13,7 +13,16 @@ if [[ "$MODE" != "public" && "$MODE" != "private" && "$MODE" != "offline" ]]; th
   exit 64
 fi
 
-CFG_FILE="${COMFYUI_MANAGER_CONFIG:-/comfyui/user/default/ComfyUI-Manager/config.ini}"
+CFG_FILE="${COMFYUI_MANAGER_CONFIG:-}"
+if [[ -z "${CFG_FILE}" ]]; then
+  if [[ -e /comfyui/user/__manager/config.ini || -d /comfyui/user/__manager ]]; then
+    CFG_FILE="/comfyui/user/__manager/config.ini"
+  elif [[ -e /comfyui/user/default/ComfyUI-Manager/config.ini || -d /comfyui/user/default/ComfyUI-Manager ]]; then
+    CFG_FILE="/comfyui/user/default/ComfyUI-Manager/config.ini"
+  else
+    CFG_FILE="/comfyui/user/__manager/config.ini"
+  fi
+fi
 mkdir -p "$(dirname "$CFG_FILE")"
 if [[ -f "$CFG_FILE" ]]; then
   if grep -q "^network_mode" "$CFG_FILE"; then

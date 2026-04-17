@@ -17,7 +17,9 @@ ARG EXTRA_PYTHON_INDEX_URL=""
 ARG INSTALL_LTX_VIDEO_NODES=false
 ARG LTX_VIDEO_REF=master
 ARG INSTALL_COMFYUI_MANAGER=true
-ARG COMFYUI_MANAGER_REF=main
+ARG COMFYUI_MANAGER_REF=""
+ARG INSTALL_COMFYUI_DOWNLOADER=true
+ARG COMFYUI_DOWNLOADER_REF=""
 ARG LTX23_PRELOAD_VARIANT=""
 ARG LTX23_PRELOAD_UPSCALERS=false
 
@@ -113,9 +115,13 @@ RUN chmod +x /usr/local/bin/comfy-node-install
 # Install ComfyUI-Manager by default so the runtime config line is not fiction.
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
     if [ "${INSTALL_COMFYUI_MANAGER}" = "true" ]; then \
-      git clone --depth=1 --branch "${COMFYUI_MANAGER_REF}" https://github.com/ltdrdata/ComfyUI-Manager.git /comfyui/custom_nodes/ComfyUI-Manager && \
-      if [ -f /comfyui/custom_nodes/ComfyUI-Manager/requirements.txt ]; then \
-        python -m pip install -r /comfyui/custom_nodes/ComfyUI-Manager/requirements.txt; \
+      if [ -n "${COMFYUI_MANAGER_REF}" ]; then \
+        git clone --depth=1 --branch "${COMFYUI_MANAGER_REF}" https://github.com/Comfy-Org/ComfyUI-Manager.git /comfyui/custom_nodes/comfyui-manager; \
+      else \
+        git clone --depth=1 https://github.com/Comfy-Org/ComfyUI-Manager.git /comfyui/custom_nodes/comfyui-manager; \
+      fi && \
+      if [ -f /comfyui/custom_nodes/comfyui-manager/requirements.txt ]; then \
+        python -m pip install -r /comfyui/custom_nodes/comfyui-manager/requirements.txt; \
       fi; \
     fi
 
@@ -125,6 +131,19 @@ ENV PIP_NO_INPUT=1
 # Copy helper script to switch Manager network mode at container start
 COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x /usr/local/bin/comfy-manager-set-mode
+
+# Install ComfyUI-Downloader by default for in-app model downloads.
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    if [ "${INSTALL_COMFYUI_DOWNLOADER}" = "true" ]; then \
+      if [ -n "${COMFYUI_DOWNLOADER_REF}" ]; then \
+        git clone --depth=1 --branch "${COMFYUI_DOWNLOADER_REF}" https://github.com/romandev-codex/ComfyUI-Downloader.git /comfyui/custom_nodes/ComfyUI-Downloader; \
+      else \
+        git clone --depth=1 https://github.com/romandev-codex/ComfyUI-Downloader.git /comfyui/custom_nodes/ComfyUI-Downloader; \
+      fi && \
+      if [ -f /comfyui/custom_nodes/ComfyUI-Downloader/requirements.txt ]; then \
+        python -m pip install -r /comfyui/custom_nodes/ComfyUI-Downloader/requirements.txt; \
+      fi; \
+    fi
 
 # Install the official LTX ComfyUI nodes when requested by the image target.
 RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \

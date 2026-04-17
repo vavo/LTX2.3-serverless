@@ -219,6 +219,77 @@ sync_directory_entries_if_missing() {
     done
 }
 
+custom_node_should_refresh() {
+    local entry_name="$1"
+    local refresh_list=",${COMFY_BOOTSTRAP_REFRESH_CUSTOM_NODES:-comfyui-manager,ComfyUI-Downloader},"
+
+    case "${refresh_list}" in
+        *,"${entry_name}",*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+remove_legacy_manager_path_if_distinct() {
+    local target_dir="$1"
+    local legacy_dir="${target_dir}/ComfyUI-Manager"
+    local normalized_dir="${target_dir}/comfyui-manager"
+    local legacy_inode=""
+    local normalized_inode=""
+
+    if [ ! -e "${legacy_dir}" ]; then
+        return
+    fi
+
+    legacy_inode="$(ls -di "${legacy_dir}" 2>/dev/null | awk '{print $1}' || true)"
+    normalized_inode="$(ls -di "${normalized_dir}" 2>/dev/null | awk '{print $1}' || true)"
+
+    if [ -n "${normalized_inode}" ] && [ "${legacy_inode}" = "${normalized_inode}" ]; then
+        return
+    fi
+
+    bootstrap_log "Removing legacy custom node path ${legacy_dir}"
+    rm -rf "${legacy_dir}"
+}
+
+sync_custom_nodes_from_image() {
+    local source_dir="$1"
+    local target_dir="$2"
+    local entry=""
+    local entry_name=""
+
+    if [ ! -d "${source_dir}" ]; then
+        return
+    fi
+
+    mkdir -p "${target_dir}"
+
+    for entry in "${source_dir}"/*; do
+        [ -e "${entry}" ] || continue
+        entry_name="$(basename "${entry}")"
+
+        if custom_node_should_refresh "${entry_name}"; then
+            bootstrap_log "Refreshing image-baked custom node ${entry_name} in persisted workspace"
+            if [ "${entry_name}" = "comfyui-manager" ]; then
+                remove_legacy_manager_path_if_distinct "${target_dir}"
+            fi
+            rm -rf "${target_dir}/${entry_name}"
+            cp -a "${entry}" "${target_dir}/${entry_name}"
+            continue
+        fi
+
+        if [ -e "${target_dir}/${entry_name}" ]; then
+            continue
+        fi
+
+        bootstrap_log "Syncing image-baked custom node ${entry_name} into persisted workspace"
+        cp -a "${entry}" "${target_dir}/${entry_name}"
+    done
+}
+
 write_extra_model_paths() {
     local base_path="$1"
     local output_file="${2:-/comfyui/extra_model_paths.yaml}"
@@ -289,10 +360,9 @@ bootstrap_workspace() {
 
     seed_directory_if_missing "${comfy_image_root}" "${comfy_root}" "ComfyUI root"
     seed_directory_if_missing "${venv_image_root}" "${venv_root}" "Python virtualenv"
-    sync_directory_entries_if_missing \
+    sync_custom_nodes_from_image \
         "${comfy_image_root}/custom_nodes" \
-        "${comfy_root}/custom_nodes" \
-        "custom node"
+        "${comfy_root}/custom_nodes"
 
     trap - RETURN
     release_bootstrap_lock "${bootstrap_lock_dir}"
