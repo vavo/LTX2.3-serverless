@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 import uuid
 from pathlib import Path
 from typing import Any
@@ -38,7 +39,7 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 COMFY_NODES = os.environ.get("COMFY_NODES", "127.0.0.1:8188").split(",")
 COMFY_INPUT_DIR = os.environ.get("COMFY_INPUT_DIR", "/comfyui/input")
 LOCAL_COMFY_NODE = os.environ.get("LOCAL_COMFY_NODE", "127.0.0.1:8188").strip()
-POD_SUBMIT_INPUT_FILES: dict[str, list[str]] = {}
+POD_SUBMIT_JOBS: dict[str, dict[str, Any]] = {}
 
 app = FastAPI(title="LTX 2.3 Payload Builder")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
@@ -189,14 +190,30 @@ async def wait_for_history(
         await asyncio.sleep(2)
 
 
-def remember_pod_submit_files(prompt_id: str, filepaths: list[str]) -> None:
-    POD_SUBMIT_INPUT_FILES[prompt_id] = list(filepaths)
+def remember_pod_submit_job(prompt_id: str, filepaths: list[str]) -> None:
+    POD_SUBMIT_JOBS[prompt_id] = {
+        "filepaths": list(filepaths),
+        "submitted_at": time.time(),
+    }
 
 
 def cleanup_tracked_pod_submit_files(prompt_id: str) -> None:
-    filepaths = POD_SUBMIT_INPUT_FILES.pop(prompt_id, [])
+    job = POD_SUBMIT_JOBS.pop(prompt_id, {})
+    filepaths = job.get("filepaths", [])
     if filepaths:
         cleanup_input_files(filepaths)
+
+
+def get_pod_submit_render_time(prompt_id: str) -> float | None:
+    job = POD_SUBMIT_JOBS.get(prompt_id)
+    if not job:
+        return None
+
+    submitted_at = job.get("submitted_at")
+    if not isinstance(submitted_at, (int, float)):
+        return None
+
+    return round(time.time() - submitted_at, 2)
 
 
 async def fetch_history_once(
@@ -241,7 +258,7 @@ def build_pod_output_payload(history_entry: dict[str, Any]) -> dict[str, list[di
             "url": f"/api/comfy-output?{query}",
             "download_url": f"/api/comfy-output?{download_query}",
         }
-        collection = "images" if entry["media_kind"] == "image" else "videos"
+        collection = "videos" if media_type.startswith("video/") else "images"
         output[collection].append(payload)
 
     return {key: value for key, value in output.items() if value}
@@ -424,7 +441,7 @@ async def submit_payload_in_pod(request: PodSubmitRequest) -> dict[str, object]:
                         status_code=502,
                         detail=detail,
                     )
-        remember_pod_submit_files(prompt_id, written_input_files)
+        remember_pod_submit_job(prompt_id, written_input_files)
         return {
             "ok": True,
             "status_code": 202,
@@ -488,6 +505,7 @@ async def get_pod_submit_status(
             "response_text": None,
         }
 
+    render_time_sec = get_pod_submit_render_time(prompt_id)
     cleanup_tracked_pod_submit_files(prompt_id)
     return {
         "ok": True,
@@ -497,6 +515,9 @@ async def get_pod_submit_status(
             "prompt_id": prompt_id,
             "node_used": target_node,
             "status": "completed",
+            "metadata": {
+                "render_time_sec": render_time_sec,
+            },
             "output": build_pod_output_payload(history_entry),
         },
         "response_text": None,

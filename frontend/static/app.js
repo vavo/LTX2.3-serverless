@@ -244,10 +244,14 @@ function renderResponse(result) {
 function renderPodStatus(responseJson) {
   const status = responseJson?.status || "";
   const hasOutput = Boolean(responseJson?.output);
+  const renderTimeSec = responseJson?.metadata?.render_time_sec;
 
   if (hasOutput) {
-    responseStatus.hidden = true;
-    responseStatus.textContent = "";
+    responseStatus.textContent =
+      typeof renderTimeSec === "number"
+        ? `Generation time: ${renderTimeSec.toFixed(2)}s`
+        : "Generation complete.";
+    responseStatus.hidden = false;
     return;
   }
 
@@ -270,6 +274,7 @@ function renderResponseMedia(output) {
   }
 
   const renderArtifactCard = (artifact, mediaKind) => {
+    const isVideo = (artifact.media_type || "").startsWith("video/") || mediaKind === "video";
     const card = document.createElement("article");
     card.className = "response-media-card";
 
@@ -283,14 +288,14 @@ function renderResponseMedia(output) {
     const saveLink = document.createElement("a");
     saveLink.className = "response-media-link";
     saveLink.href = artifact.download_url || artifact.url;
-    saveLink.textContent = mediaKind === "video" ? "Save video" : "Save image";
+    saveLink.textContent = isVideo ? "Save video" : "Save image";
     saveLink.setAttribute("download", artifact.filename);
 
     header.appendChild(title);
     header.appendChild(saveLink);
     card.appendChild(header);
 
-    if (mediaKind === "video") {
+    if (isVideo) {
       const video = document.createElement("video");
       video.className = "response-video";
       video.src = artifact.url;
@@ -364,7 +369,11 @@ async function initializeConfig() {
   updateDurationSummary();
 }
 
-async function buildPayload({ scroll = true, successMessage = "Payload ready." } = {}) {
+async function buildPayload({
+  scroll = true,
+  showPreview = true,
+  successMessage = "Payload ready.",
+} = {}) {
   if (!promptField.value.trim()) {
     setFeedback("Prompt is required.", "error");
     promptField.focus();
@@ -401,8 +410,8 @@ async function buildPayload({ scroll = true, successMessage = "Payload ready." }
   state.payloadJson = JSON.stringify(data.payload, null, 2);
   payloadOutput.textContent = state.payloadJson;
   renderSummary(data.summary);
-  payloadPanel.hidden = state.submissionMode === "pod";
-  if (scroll && state.submissionMode !== "pod") {
+  payloadPanel.hidden = !showPreview;
+  if (scroll && showPreview) {
     payloadPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   if (successMessage) {
@@ -500,6 +509,7 @@ submitButton.addEventListener("click", async () => {
   try {
     const payload = await buildPayload({
       scroll: false,
+      showPreview: state.submissionMode !== "pod",
       successMessage:
         state.submissionMode === "pod"
           ? ""

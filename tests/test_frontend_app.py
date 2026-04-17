@@ -53,11 +53,11 @@ class FakeClientSession:
 
 class TestFrontendApp(unittest.TestCase):
     def setUp(self) -> None:
-        frontend_app.POD_SUBMIT_INPUT_FILES.clear()
+        frontend_app.POD_SUBMIT_JOBS.clear()
         self.client = TestClient(frontend_app.app)
 
     def tearDown(self) -> None:
-        frontend_app.POD_SUBMIT_INPUT_FILES.clear()
+        frontend_app.POD_SUBMIT_JOBS.clear()
 
     def test_pod_submit_returns_queued_job(self) -> None:
         payload = {
@@ -88,12 +88,12 @@ class TestFrontendApp(unittest.TestCase):
         self.assertEqual(body["response_json"]["status"], "queued")
         self.assertEqual(body["response_json"]["prompt_id"], "prompt-123")
         self.assertEqual(
-            frontend_app.POD_SUBMIT_INPUT_FILES["prompt-123"],
+            frontend_app.POD_SUBMIT_JOBS["prompt-123"]["filepaths"],
             ["/tmp/source.png"],
         )
 
     def test_pod_submit_status_completion_cleans_tracked_files(self) -> None:
-        frontend_app.remember_pod_submit_files("prompt-456", ["/tmp/source.png"])
+        frontend_app.remember_pod_submit_job("prompt-456", ["/tmp/source.png"])
 
         with (
             patch.object(
@@ -102,22 +102,34 @@ class TestFrontendApp(unittest.TestCase):
                 return_value=FakeClientSession(
                     get_response=FakeResponse(
                         status=200,
-                        json_data={"prompt-456": {"outputs": {"1": {"images": []}}}},
+                        json_data={
+                            "prompt-456": {
+                                "outputs": {
+                                    "1": {
+                                        "images": [{"filename": "frame.png", "subfolder": ""}],
+                                        "videos": [{"filename": "clip.mp4", "subfolder": ""}],
+                                    }
+                                }
+                            }
+                        },
                     )
                 ),
             ),
             patch.object(frontend_app, "cleanup_input_files") as cleanup_mock,
+            patch.object(frontend_app.time, "time", return_value=110.25),
         ):
+            frontend_app.POD_SUBMIT_JOBS["prompt-456"]["submitted_at"] = 100.0
             response = self.client.get("/api/pod-submit/prompt-456?node=127.0.0.1:8188")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["response_json"]["status"], "completed")
+        self.assertEqual(body["response_json"]["metadata"]["render_time_sec"], 10.25)
         cleanup_mock.assert_called_once_with(["/tmp/source.png"])
-        self.assertNotIn("prompt-456", frontend_app.POD_SUBMIT_INPUT_FILES)
+        self.assertNotIn("prompt-456", frontend_app.POD_SUBMIT_JOBS)
         self.assertEqual(
-            body["response_json"]["output"]["images"][0]["url"],
-            "/api/comfy-output?filename=frame.png&subfolder=&media_kind=image",
+            body["response_json"]["output"]["videos"][0]["url"],
+            "/api/comfy-output?filename=clip.mp4&subfolder=&media_kind=video",
         )
 
     def test_comfy_output_returns_file_response(self) -> None:
