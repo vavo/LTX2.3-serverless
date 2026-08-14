@@ -13,10 +13,10 @@ This document outlines the environment variables available for configuring the w
 | `WORKSPACE_ROOT`     | Override the detected persistent workspace root. Useful only if your mount layout differs from RunPod defaults.                                                                                                              | auto    |
 | `WORKSPACE_STATE_ROOT` | Override the state directory inside the persistent workspace.                                                                                                                         | `/workspace/worker-comfyui` |
 | `HUGGINGFACE_ACCESS_TOKEN` | Optional token used for startup downloads and other Hugging Face fetches. `HF_TOKEN` and `HUGGINGFACE_TOKEN` are also accepted aliases by the preload script.                 | –       |
-| `LTX23_PRELOAD_VARIANT` | Optional LTX checkpoint preload at worker startup: `distilled`, `dev`, `distilled-fp8`, or `dev-fp8`.                                                                     | empty   |
-| `LTX23_PRELOAD_UPSCALERS` | When `true`, also preload the official LTX latent upscalers and distilled LoRA for the two-stage path.                                                                  | `false` |
-| `LTX23_DOWNLOAD_BACKEND` | LTX preload download backend: `auto` (prefer `huggingface_hub` + `hf_transfer`), `hf_hub`, or `wget`.                                                                   | `auto`  |
-| `COMFYUI_MANAGER_CONFIG` | Override the ComfyUI-Manager `config.ini` path used by `comfy-manager-set-mode`. ComfyUI-Manager is installed in the image by default.                                      | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+| `LTX25_PRELOAD_VARIANT` | Optional LTX 2.5 model-stack preload: `distilled-int8`. | empty |
+| `LTX25_PRELOAD_PROMPT_ENHANCER` | Also preload the Gemma 4 prompt-enhancer checkpoint. | `true` |
+| `LTX25_DOWNLOAD_BACKEND` | Download backend: `auto` (prefer `huggingface_hub`), `hf_hub`, or `wget`. | `auto` |
+| `COMFYUI_MANAGER_CONFIG` | Override the built-in ComfyUI Manager `config.ini` path used by `comfy-manager-set-mode`. | `/comfyui/user/__manager/config.ini` |
 | `INDRO_API_KEY` | Secret checked only by the legacy custom `input.prompt` + `input.image_url` handler path. Workflow-mode jobs do not use it. | `dev_token_123` |
 | `REDIS_URL` | Redis connection used for rate limiting, dedupe, job status, and circuit breaker state. | `redis://localhost:6379` |
 | `COMFY_NODES` | Comma-separated ComfyUI API hosts that can accept `/prompt` and `/history` requests. | `127.0.0.1:8188` |
@@ -42,8 +42,8 @@ For the least annoying first worker boot on RunPod serverless, set:
 PERSIST_WORKSPACE=true
 RUN_MODE=worker
 COMFY_NODES=127.0.0.1:8188
-LTX23_PRELOAD_VARIANT=distilled
-LTX23_PRELOAD_UPSCALERS=true
+LTX25_PRELOAD_VARIANT=distilled-int8
+LTX25_PRELOAD_PROMPT_ENHANCER=true
 HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 ```
 
@@ -53,12 +53,12 @@ For a plain pod:
 PERSIST_WORKSPACE=true
 RUN_MODE=pod
 LOCAL_COMFY_NODE=127.0.0.1:8188
-LTX23_PRELOAD_VARIANT=distilled
-LTX23_PRELOAD_UPSCALERS=true
+LTX25_PRELOAD_VARIANT=distilled-int8
+LTX25_PRELOAD_PROMPT_ENHANCER=true
 HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 ```
 
-That startup preload covers the main LTX checkpoint, the official latent upscalers, and the distilled LoRA. Some secondary weights used by `ComfyUI-LTXVideo`, such as Gemma or text encoders, can still download on first render into the persistent Hugging Face cache.
+That startup preload covers every model referenced by the checked-in LTX 2.5 image-to-video workflow.
 
 ## Runtime Paths
 
@@ -75,7 +75,7 @@ With workspace persistence enabled, the worker uses these paths:
 | Generated model-path config | `/comfyui/extra_model_paths.yaml` |
 | Current handler input staging | `/comfyui/input` |
 | Current handler output pickup | `/comfyui/output` |
-| ComfyUI-Manager config | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+| ComfyUI Manager config | `/comfyui/user/__manager/config.ini` |
 
 On serverless, `/workspace` is the worker's internal alias for `/runpod-volume`.
 
@@ -122,9 +122,9 @@ If the S3 environment variables are correctly configured, a successful workflow 
   "output": {
     "videos": [
       {
-        "filename": "LTX_2.3_i2v.mp4",
+        "filename": "LTX-2.5_i2v.mp4",
         "type": "url",
-        "data": "https://example-bucket.s3.amazonaws.com/renders/job-123/00-LTX_2.3_i2v.mp4?...",
+        "data": "https://example-bucket.s3.amazonaws.com/renders/job-123/00-LTX-2.5_i2v.mp4?...",
         "media_type": "video/mp4"
       }
     ]

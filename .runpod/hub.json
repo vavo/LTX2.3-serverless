@@ -1,23 +1,23 @@
 {
-  "title": "LTX 2.3 ComfyUI Worker",
-  "description": "Run LTX 2.3 video inference on ComfyUI with persistent /workspace state",
+  "title": "LTX 2.5 ComfyUI Worker",
+  "description": "Run Blackwell-first LTX 2.5 video inference on ComfyUI with persistent /workspace state",
   "type": "serverless",
   "category": "image",
   "iconUrl": "https://cpjrphpz3t5wbwfe.public.blob.vercel-storage.com/comfy-ui.png",
   "config": {
     "runsOn": "GPU",
     "containerDiskInGb": 120,
-    "gpuIds": "ADA_24",
+    "gpuIds": "BLACKWELL_180",
     "gpuCount": 1,
-    "allowedCudaVersions": ["13.0", "12.8", "12.7", "12.6"],
+    "allowedCudaVersions": ["13.0", "12.8"],
     "env": [
       {
-        "key": "LTX23_PRELOAD_VARIANT",
+        "key": "LTX25_PRELOAD_VARIANT",
         "input": {
-          "name": "LTX 2.3 Checkpoint",
+          "name": "LTX 2.5 Model Profile",
           "type": "string",
-          "description": "Optional startup preload: distilled, dev, distilled-fp8, or dev-fp8",
-          "default": "distilled",
+          "description": "Startup preload profile: distilled-int8",
+          "default": "distilled-int8",
           "advanced": false
         }
       },
@@ -32,12 +32,12 @@
         }
       },
       {
-        "key": "LTX23_PRELOAD_UPSCALERS",
+        "key": "LTX25_PRELOAD_PROMPT_ENHANCER",
         "input": {
-          "name": "Preload Upscalers",
+          "name": "Preload Prompt Enhancer",
           "type": "boolean",
-          "description": "Also preload the official LTX spatial and temporal upscalers into persistent storage",
-          "default": false,
+          "description": "Also preload the Gemma prompt enhancer used by the bundled workflow",
+          "default": true,
           "advanced": true
         }
       },
@@ -46,7 +46,7 @@
         "input": {
           "name": "Hugging Face Token",
           "type": "string",
-          "description": "Optional token for gated or rate-limited model downloads during startup",
+          "description": "Read token with accepted access to the gated LTX 2.5 model",
           "default": "",
           "advanced": true
         }

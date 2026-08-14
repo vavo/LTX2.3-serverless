@@ -1,7 +1,7 @@
 {
   "tests": [],
   "config": {
-    "gpuTypeId": "NVIDIA GeForce RTX 4090",
+    "gpuTypeId": "NVIDIA B200",
     "gpuCount": 1,
     "env": [
       {
@@ -9,8 +9,8 @@
         "value": "false"
       },
       {
-        "key": "LTX23_PRELOAD_VARIANT",
-        "value": "distilled"
+        "key": "LTX25_PRELOAD_VARIANT",
+        "value": "distilled-int8"
       },
       {
         "key": "PERSIST_WORKSPACE",

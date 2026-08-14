@@ -97,7 +97,7 @@ The persistence and LTX preload paths are covered by shell tests and do not depe
   ```bash
   bash tests/test_restore_snapshot.sh
   bash tests/test_bootstrap_workspace.sh
-  bash tests/test_bootstrap_ltx23.sh
+  bash tests/test_bootstrap_ltx25.sh
   ```
 
 ## Local API Simulation (using Docker Compose)

@@ -1,6 +1,6 @@
 # Deployment
 
-This guide explains how to deploy this ComfyUI-based LTX 2.3 worker as a RunPod serverless endpoint, covering both pre-built image targets and custom-built images.
+This guide explains how to deploy this Blackwell-first ComfyUI LTX 2.5 worker as a RunPod serverless endpoint.
 
 ## Deploying Pre-Built Official Images
 
@@ -10,12 +10,12 @@ This is the simplest method if the official images meet your needs.
 
 - Create a [new template](https://runpod.io/console/serverless/user/templates) by clicking on `New Template`
 - In the dialog, configure:
-  - Template Name: `ltx2.3-worker` (or your preferred name)
+  - Template Name: `ltx2.5-worker` (or your preferred name)
   - Template Type: serverless (change template type to "serverless")
-  - Container Image: Use one of the LTX-oriented tags from the main [README.md](../README.md#available-docker-images), for example `<repo>:<version>-ltx2.3-distilled-cu128`. If you are building your own clean base, plain `base` now defaults to CUDA 12.8.1 / cu128.
+  - Container Image: Use `<repo>:<version>-ltx2.5-distilled-int8-cu130`. CUDA 12.8 is available as the secondary `-cu128` tag.
   - Container Registry Credentials: Leave as default (images are public).
   - Container Disk: Adjust based on the chosen image tag, see [GPU Recommendations](#gpu-recommendations).
-  - (optional) Environment Variables: Configure `LTX23_PRELOAD_VARIANT`, `HUGGINGFACE_ACCESS_TOKEN`, S3, or other settings (see [Configuration Guide](configuration.md)).
+  - (optional) Environment Variables: Configure `LTX25_PRELOAD_VARIANT`, `HUGGINGFACE_ACCESS_TOKEN`, S3, or other settings (see [Configuration Guide](configuration.md)).
     - Note: If you don't configure S3, images are returned as base64. For persistent storage across jobs without S3, consider using a [Network Volume](customization.md#method-2-network-volume-alternative-for-models). If models on your network volume are not being detected, see [Network Volumes & Model Paths](network-volumes.md) for troubleshooting steps.
 - Click on `Save Template`
 
@@ -24,14 +24,14 @@ This is the simplest method if the official images meet your needs.
 - Navigate to [`Serverless > Endpoints`](https://www.runpod.io/console/serverless/user/endpoints) and click on `New Endpoint`
 - In the dialog, configure:
 
-  - Endpoint Name: `ltx2-3` (or your preferred name)
+  - Endpoint Name: `ltx2-5` (or your preferred name)
   - Worker configuration: Select a GPU that can run the model included in your chosen image (see [GPU recommendations](#gpu-recommendations)).
   - Active Workers: `0` (Scale as needed based on expected load).
   - Max Workers: `3` (Set a limit based on your budget and scaling needs).
   - GPUs/Worker: `1`
   - Idle Timeout: `5` (Default is usually fine, adjust if needed).
   - Flash Boot: `enabled` (Recommended for faster worker startup).
-  - Select Template: `ltx2.3-worker` (or the name you gave your template).
+  - Select Template: `ltx2.5-worker` (or the name you gave your template).
   - (optional) Advanced: Attach a Network Volume under `Select Network Volume`. For this repo that is not really optional unless you like paying cold-start tax on every worker boot. See the [Customization Guide](customization.md#method-2-network-volume-alternative-for-models) and [Network Volumes & Model Paths](network-volumes.md).
   - For serverless endpoints, leave `RUN_MODE` unset or set it explicitly to `worker`.
 
@@ -43,21 +43,20 @@ Use this for a sane first worker boot:
 PERSIST_WORKSPACE=true
 RUN_MODE=worker
 COMFY_NODES=127.0.0.1:8188
-LTX23_PRELOAD_VARIANT=distilled
-LTX23_PRELOAD_UPSCALERS=true
+LTX25_PRELOAD_VARIANT=distilled-int8
+LTX25_PRELOAD_PROMPT_ENHANCER=true
 HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 ```
 
-That preloads the main LTX model stack into persistent storage. Secondary assets used by `ComfyUI-LTXVideo`, especially Gemma and text-encoder weights, may still fetch on the first render and then stay cached under `/workspace/worker-comfyui/cache/huggingface`.
+That preloads the full model stack used by the checked-in local LTX 2.5 workflow into persistent storage.
 
 ## Hardware Baseline
 
-- CUDA 12.8 is the default target in this repo.
-- Plain `docker build ...` and bake target `base` now default to CUDA 12.8.1 with the cu128 PyTorch wheel index.
-- CUDA 13 is supported here as an experimental path.
-- The LTX / ComfyUI docs recommend 32GB+ VRAM and 100GB+ free disk for a comfortable setup.
-- For the CUDA 12.8 path, PyTorch 2.8+ is the intended floor.
-- For the CUDA 13 path, official `cu130` wheels start at PyTorch 2.9+, so treat that lane accordingly.
+- CUDA 13.0.2 with cu130 wheels is the default target.
+- CUDA 12.8.1 with cu128 wheels is the only fallback target.
+- Both use PyTorch 2.11.0, torchvision 0.26.0, and torchaudio 2.11.0.
+- Use a Blackwell GPU with at least 48 GB VRAM.
+- Attach at least 100 GB of persistent storage.
 
 ## Current Truth
 
@@ -69,7 +68,7 @@ That preloads the main LTX model stack into persistent storage. Secondary assets
 - Standard RunPod endpoints: `/run`, `/runsync`, `/health`.
 - Input workflow JSON plus optional input images.
 - Output handling for image and video artifacts from ComfyUI.
-- Checked-in LTX image-to-video API workflow at [`video_ltx2_3_i2v_API.json`](../video_ltx2_3_i2v_API.json).
+- Checked-in LTX image-to-video API workflow at [`video_ltx2_5_i2v_API.json`](../video_ltx2_5_i2v_API.json).
 
 ### Compatibility Baggage
 
@@ -84,12 +83,10 @@ That preloads the main LTX model stack into persistent storage. Secondary assets
 
 | Target                           | Image Tag Suffix              | Minimum VRAM Required | Recommended Container Size |
 | -------------------------------- | ----------------------------- | --------------------- | -------------------------- |
-| Clean base, default CUDA 12.8    | `base`                        | N/A                   | 20 GB                      |
-| LTX 2.3 distilled                | `ltx2.3-distilled-cu128`      | 32 GB                 | 100 GB                     |
-| LTX 2.3 distilled fp8            | `ltx2.3-distilled-fp8-cu128`  | 24-32 GB              | 100 GB                     |
-| LTX 2.3 distilled, experimental  | `ltx2.3-distilled-cu130`      | 32 GB                 | 100 GB                     |
-| CUDA 12.8 clean base, explicit alias | `base-cuda12.8.1`         | N/A                   | 20 GB                      |
-| CUDA 13 clean base               | `base-cuda13.0`               | N/A                   | 20 GB                      |
+| Clean base, CUDA 13.0            | `base`                               | N/A     | 20 GB  |
+| LTX 2.5 distilled INT8           | `ltx2.5-distilled-int8-cu130`        | 48 GB   | 100 GB |
+| LTX 2.5 distilled INT8 fallback  | `ltx2.5-distilled-int8-cu128`        | 48 GB   | 100 GB |
+| Clean base, CUDA 12.8            | `base-cuda12.8.1`                    | N/A     | 20 GB  |
 
 _Note: Container sizes are approximate and assume a network volume for persistent state. Without a network volume, you will need more local disk and much more patience._
 
@@ -166,7 +163,7 @@ For a sane first pod boot, use:
 PERSIST_WORKSPACE=true
 RUN_MODE=pod
 LOCAL_COMFY_NODE=127.0.0.1:8188
-LTX23_PRELOAD_VARIANT=distilled
-LTX23_PRELOAD_UPSCALERS=true
+LTX25_PRELOAD_VARIANT=distilled-int8
+LTX25_PRELOAD_PROMPT_ENHANCER=true
 HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 ```

@@ -24,13 +24,14 @@ class TestLtxPayloadBuilder(unittest.TestCase):
         workflow = payload["input"]["workflow"]
         image = payload["input"]["images"][0]
 
-        self.assertEqual(workflow["267:266"]["inputs"]["value"], "A camera push-in through a neon alley.")
-        self.assertEqual(workflow["267:225"]["inputs"]["value"], 121)
-        self.assertEqual(workflow["267:257"]["inputs"]["value"], 720)
-        self.assertEqual(workflow["267:258"]["inputs"]["value"], 1280)
-        self.assertEqual(workflow["267:260"]["inputs"]["value"], 24)
-        self.assertEqual(workflow["267:274"]["inputs"]["sampling_mode"], "off")
-        self.assertEqual(workflow["269"]["inputs"]["image"], "My_Scene_Final.png")
+        self.assertEqual(workflow["398:376"]["inputs"]["value"], "A camera push-in through a neon alley.")
+        self.assertEqual(workflow["398:362"]["inputs"]["value"], 121)
+        self.assertEqual(workflow["398:372"]["inputs"]["value"], 720)
+        self.assertEqual(workflow["398:360"]["inputs"]["value"], 1280)
+        self.assertEqual(workflow["398:361"]["inputs"]["value"], 24)
+        self.assertEqual(workflow["398:380"]["inputs"]["sampling_mode"], "off")
+        self.assertFalse(workflow["398:383"]["inputs"]["value"])
+        self.assertEqual(workflow["395"]["inputs"]["image"], "My_Scene_Final.png")
         self.assertEqual(image["name"], "My_Scene_Final.png")
         self.assertEqual(image["image"], "data:image/png;base64,AAAA")
 

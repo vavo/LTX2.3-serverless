@@ -1,8 +1,8 @@
-![LTX 2.3 Worker Banner](https://cpjrphpz3t5wbwfe.public.blob.vercel-storage.com/worker-comfyui_banner-CDZ6JIEByEePozCT1ZrmeVOsN5NX3U.jpeg)
+![LTX 2.5 Worker Banner](https://cpjrphpz3t5wbwfe.public.blob.vercel-storage.com/worker-comfyui_banner-CDZ6JIEByEePozCT1ZrmeVOsN5NX3U.jpeg)
 
 ---
 
-Run [LTX 2.3](https://huggingface.co/Lightricks/LTX-2.3) video workflows on [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a RunPod serverless endpoint.
+Run [LTX 2.5](https://huggingface.co/Lightricks/LTX-2.5) video workflows on [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a RunPod serverless endpoint.
 
 ---
 
@@ -12,23 +12,23 @@ Use the hub metadata in `.runpod/hub.json` when publishing this template to RunP
 
 ## What is included?
 
-- Latest ComfyUI base image with persistent `/workspace` bootstrap
+- Pinned ComfyUI v0.33.1 with built-in Manager and persistent `/workspace` bootstrap
 - Official `ComfyUI-LTXVideo` custom nodes
-- Optional startup preload for the main LTX 2.3 checkpoint
-- CUDA 12.8 as the default track, with an experimental CUDA 13 path for newer Blackwell-oriented hosts
+- Optional startup preload for the complete LTX 2.5 local workflow stack
+- CUDA 13.0 as the Blackwell-first default, with CUDA 12.8 as the only fallback
 
 ## Recommended deployment shape
 
 - Attach a network volume. Without it, cold starts will repeatedly redownload large model assets like the machine has a concussion.
 - Keep `PERSIST_WORKSPACE=true`.
-- Use at least 32 GB VRAM for practical LTX 2.3 usage.
+- Use at least 48 GB VRAM for the distilled INT8 profile.
 - Plan for roughly 100 GB or more of disk if you want a comfortable setup with cached assets and optional upscalers.
 
 ## Important environment variables
 
-- `LTX23_PRELOAD_VARIANT`: `distilled`, `dev`, `distilled-fp8`, or `dev-fp8`
-- `LTX23_PRELOAD_UPSCALERS`: preload official LTX spatial and temporal upscalers plus the distilled LoRA for the two-stage path
-- `HUGGINGFACE_ACCESS_TOKEN`: optional token for startup downloads
+- `LTX25_PRELOAD_VARIANT`: `distilled-int8`
+- `LTX25_PRELOAD_PROMPT_ENHANCER`: preload the Gemma prompt enhancer
+- `HUGGINGFACE_ACCESS_TOKEN`: token with accepted access to the gated LTX 2.5 repository
 - `COMFY_ORG_API_KEY`: optional key for Comfy.org API nodes
 
 ## Usage

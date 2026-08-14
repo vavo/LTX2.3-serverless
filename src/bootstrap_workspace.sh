@@ -221,7 +221,7 @@ sync_directory_entries_if_missing() {
 
 custom_node_should_refresh() {
     local entry_name="$1"
-    local refresh_list=",${COMFY_BOOTSTRAP_REFRESH_CUSTOM_NODES:-comfyui-manager,ComfyUI-Downloader},"
+    local refresh_list=",${COMFY_BOOTSTRAP_REFRESH_CUSTOM_NODES:-ComfyUI-Downloader},"
 
     case "${refresh_list}" in
         *,"${entry_name}",*)
@@ -231,28 +231,6 @@ custom_node_should_refresh() {
             return 1
             ;;
     esac
-}
-
-remove_legacy_manager_path_if_distinct() {
-    local target_dir="$1"
-    local legacy_dir="${target_dir}/ComfyUI-Manager"
-    local normalized_dir="${target_dir}/comfyui-manager"
-    local legacy_inode=""
-    local normalized_inode=""
-
-    if [ ! -e "${legacy_dir}" ]; then
-        return
-    fi
-
-    legacy_inode="$(ls -di "${legacy_dir}" 2>/dev/null | awk '{print $1}' || true)"
-    normalized_inode="$(ls -di "${normalized_dir}" 2>/dev/null | awk '{print $1}' || true)"
-
-    if [ -n "${normalized_inode}" ] && [ "${legacy_inode}" = "${normalized_inode}" ]; then
-        return
-    fi
-
-    bootstrap_log "Removing legacy custom node path ${legacy_dir}"
-    rm -rf "${legacy_dir}"
 }
 
 sync_custom_nodes_from_image() {
@@ -273,9 +251,6 @@ sync_custom_nodes_from_image() {
 
         if custom_node_should_refresh "${entry_name}"; then
             bootstrap_log "Refreshing image-baked custom node ${entry_name} in persisted workspace"
-            if [ "${entry_name}" = "comfyui-manager" ]; then
-                remove_legacy_manager_path_if_distinct "${target_dir}"
-            fi
             rm -rf "${target_dir}/${entry_name}"
             cp -a "${entry}" "${target_dir}/${entry_name}"
             continue
@@ -393,7 +368,7 @@ bootstrap_workspace() {
     sync_named_files_from_image \
         "${workflow_template_source_root}" \
         "${workflow_target_dir}" \
-        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_3_i2v_API.json}"
+        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_5_i2v_API.json}"
 
     trap - RETURN
     release_bootstrap_lock "${bootstrap_lock_dir}"

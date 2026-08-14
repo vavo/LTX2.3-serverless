@@ -4,8 +4,8 @@ set -euo pipefail
 
 source /bootstrap_workspace.sh
 bootstrap_workspace
-source /bootstrap_ltx23.sh
-bootstrap_ltx23
+source /bootstrap_ltx25.sh
+bootstrap_ltx25
 echo "worker-comfyui: Bootstrap complete; starting runtime services"
 
 start_local_redis() {
@@ -164,6 +164,7 @@ start_comfyui() {
     echo "worker-comfyui: Starting ComfyUI"
     local comfy_args=(
         python -u /comfyui/main.py
+        --enable-manager
         --disable-auto-launch
         --disable-metadata
         --verbose "${COMFY_LOG_LEVEL}"

@@ -46,7 +46,7 @@ With persistence enabled, the current runtime uses these paths:
 | Generated extra model paths file | `/comfyui/extra_model_paths.yaml` |
 | Current handler input staging | `/comfyui/input` |
 | Current handler output pickup | `/comfyui/output` |
-| ComfyUI-Manager config | `/comfyui/user/default/ComfyUI-Manager/config.ini` |
+| ComfyUI Manager config | `/comfyui/user/__manager/config.ini` |
 
 The input and output paths above reflect the current handler implementation. The persisted ComfyUI root still lives under `/workspace/worker-comfyui/comfyui`, and `/comfyui` points at that persisted root after bootstrap.
 

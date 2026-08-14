@@ -1,6 +1,6 @@
 # Introduction
 
-This project provides a way to run [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a serverless API worker on the [RunPod](https://www.runpod.io/) platform, with the current repo focused on LTX 2.3 video inference rather than generic image-model packaging.
+This project runs [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a RunPod serverless worker focused on LTX 2.5 video inference.
 
 It packages ComfyUI into Docker images, manages job handling via the `runpod` SDK, uses websockets for efficient communication with ComfyUI, and facilitates configuration through environment variables.
 
@@ -10,12 +10,12 @@ It packages ComfyUI into Docker images, manages job handling via the `runpod` SD
 - Uses Python 3.12 and a persistent `/workspace` bootstrap for ComfyUI, the venv, and caches.
 - Installs the official `ComfyUI-LTXVideo` nodes in the LTX image targets.
 - Targets CUDA 12.8 by default and CUDA 13 experimentally for newer Blackwell-oriented deployments.
-- Can preload the main LTX 2.3 checkpoint at startup into persistent storage.
+- Can preload the complete local LTX 2.5 workflow stack into persistent storage.
 - Can also preload the official latent upscalers and distilled LoRA for the two-stage distilled path.
 
 ## Why It Wins
 
-LTX 2.3 is interesting. Rebuilding Comfy, reinstalling nodes, and redownloading weights on every serverless boot is not.
+LTX 2.5 is interesting. Rebuilding Comfy, reinstalling nodes, and redownloading weights on every serverless boot is not.
 
 This repo optimizes the boring part:
 - Keep the expensive state on `/workspace`
@@ -41,7 +41,7 @@ This document outlines the key operational and structural conventions for the pr
   ```
 - **Development Builds:** For faster development iterations, build the clean base target and keep model/state downloads on the persistent workspace:
   ```bash
-  docker build --target base --platform linux/amd64 -t ltx23-worker:dev .
+  docker build --target base --platform linux/amd64 -t ltx25-worker:dev .
   ```
 - **Customization:** Follow the methods in the `README.md` for adding custom models/nodes (Network Volume or Dockerfile edits + snapshots).
 
@@ -66,7 +66,7 @@ This document outlines the key operational and structural conventions for the pr
 - **Code Changes:** After modifying handler code, always rebuild the Docker image before testing with `docker-compose`:
   ```bash
   docker-compose down
-  docker build --target base -t ltx23-worker:dev .
+  docker build --target base -t ltx25-worker:dev .
   docker-compose up -d
   ```
 - **Debugging:** Use strategic logging/print statements to understand external API responses (like ComfyUI's error formats) before implementing error handling.

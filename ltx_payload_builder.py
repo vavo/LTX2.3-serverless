@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent
-WORKFLOW_TEMPLATE_PATH = ROOT_DIR / "video_ltx2_3_i2v_API.json"
+WORKFLOW_TEMPLATE_PATH = ROOT_DIR / "video_ltx2_5_i2v_API.json"
 
 FPS = 24
 SECONDS_MIN = 1.0
@@ -21,15 +21,16 @@ ASPECT_RATIOS: dict[str, dict[str, int]] = {
     "1:1": {"width": 1024, "height": 1024},
 }
 
-PROMPT_NODE = "267:266"
-IMAGE_NODE = "269"
-LENGTH_NODE = "267:225"
-WIDTH_NODE = "267:257"
-HEIGHT_NODE = "267:258"
-FPS_NODE = "267:260"
-PROMPT_OPTIMIZER_NODE = "267:274"
-SEED_NODE_1 = "267:216"
-SEED_NODE_2 = "267:237"
+PROMPT_NODE = "398:376"
+IMAGE_NODE = "395"
+LENGTH_NODE = "398:362"
+WIDTH_NODE = "398:372"
+HEIGHT_NODE = "398:360"
+FPS_NODE = "398:361"
+PROMPT_OPTIMIZER_NODE = "398:380"
+PROMPT_OPTIMIZER_TOGGLE_NODE = "398:383"
+SEED_NODE_1 = "398:338"
+SEED_NODE_2 = "398:339"
 
 with WORKFLOW_TEMPLATE_PATH.open("r", encoding="utf-8") as template_file:
     WORKFLOW_TEMPLATE = json.load(template_file)
@@ -84,6 +85,7 @@ def build_payload(
     workflow[PROMPT_OPTIMIZER_NODE]["inputs"]["sampling_mode"] = (
         "on" if optimize_prompt else "off"
     )
+    workflow[PROMPT_OPTIMIZER_TOGGLE_NODE]["inputs"]["value"] = optimize_prompt
     workflow[PROMPT_OPTIMIZER_NODE]["inputs"]["sampling_mode.seed"] = random_source.randrange(
         1, 10**9
     )
