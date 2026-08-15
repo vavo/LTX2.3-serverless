@@ -13,7 +13,7 @@ WORKFLOW_TEMPLATE_PATH = ROOT_DIR / "video_ltx2_5_i2v_API.json"
 FPS = 24
 SECONDS_MIN = 1.0
 SECONDS_MAX = 20.0
-SECONDS_STEP = 0.5
+SECONDS_STEP = 1.0
 
 ASPECT_RATIOS: dict[str, dict[str, int]] = {
     "16:9": {"width": 1280, "height": 720},
@@ -23,7 +23,7 @@ ASPECT_RATIOS: dict[str, dict[str, int]] = {
 
 PROMPT_NODE = "398:376"
 IMAGE_NODE = "395"
-LENGTH_NODE = "398:362"
+DURATION_NODE = "398:362"
 WIDTH_NODE = "398:372"
 HEIGHT_NODE = "398:360"
 FPS_NODE = "398:361"
@@ -41,6 +41,8 @@ def seconds_to_frames(seconds: float) -> int:
         raise ValueError(
             f"Duration must be between {SECONDS_MIN:g} and {SECONDS_MAX:g} seconds."
         )
+    if not float(seconds).is_integer():
+        raise ValueError("Duration must be a whole number of seconds.")
     return int(round(seconds * FPS)) + 1
 
 
@@ -71,14 +73,14 @@ def build_payload(
         raise ValueError("Source image must be provided as a data URL.")
 
     dimensions = ASPECT_RATIOS[aspect_ratio]
-    frames = seconds_to_frames(seconds)
+    seconds_to_frames(seconds)
     normalized_image_name = sanitize_image_name(image_name)
     random_source = rng or random.SystemRandom()
 
     workflow = copy.deepcopy(WORKFLOW_TEMPLATE)
     workflow[PROMPT_NODE]["inputs"]["value"] = prompt
     workflow[IMAGE_NODE]["inputs"]["image"] = normalized_image_name
-    workflow[LENGTH_NODE]["inputs"]["value"] = frames
+    workflow[DURATION_NODE]["inputs"]["value"] = int(seconds)
     workflow[WIDTH_NODE]["inputs"]["value"] = dimensions["width"]
     workflow[HEIGHT_NODE]["inputs"]["value"] = dimensions["height"]
     workflow[FPS_NODE]["inputs"]["value"] = FPS

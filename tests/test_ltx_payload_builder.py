@@ -10,6 +10,9 @@ class TestLtxPayloadBuilder(unittest.TestCase):
         self.assertEqual(seconds_to_frames(1), 25)
         self.assertEqual(seconds_to_frames(20), 481)
 
+        with self.assertRaisesRegex(ValueError, "whole number"):
+            seconds_to_frames(5.5)
+
     def test_build_payload_updates_workflow_template(self) -> None:
         payload = build_payload(
             prompt="A camera push-in through a neon alley.",
@@ -25,7 +28,13 @@ class TestLtxPayloadBuilder(unittest.TestCase):
         image = payload["input"]["images"][0]
 
         self.assertEqual(workflow["398:376"]["inputs"]["value"], "A camera push-in through a neon alley.")
-        self.assertEqual(workflow["398:362"]["inputs"]["value"], 121)
+        self.assertEqual(workflow["398:362"]["inputs"]["value"], 5)
+        self.assertEqual(
+            workflow["398:362"]["inputs"]["value"]
+            * workflow["398:361"]["inputs"]["value"]
+            + 1,
+            121,
+        )
         self.assertEqual(workflow["398:372"]["inputs"]["value"], 720)
         self.assertEqual(workflow["398:360"]["inputs"]["value"], 1280)
         self.assertEqual(workflow["398:361"]["inputs"]["value"], 24)
