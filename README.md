@@ -1,71 +1,63 @@
-# LTX 2.5 Serverless Worker
+# LTX 2.5 for RunPod
 
-Blackwell-first LTX 2.5 inference on ComfyUI and RunPod, with persistent models, caches, ComfyUI, and Python environment under `/workspace`.
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-vavo-5F7FFF?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/vavo) [![Sponsor on GitHub](https://img.shields.io/badge/Sponsor%20on-GitHub-24292F?style=for-the-badge&logo=github)](https://github.com/sponsors/vavo) [![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-FF424D?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/vavo)
 
-## Stack
+Generate LTX 2.5 image-to-video on RunPod without rebuilding the same GPU environment every time. Use it as a serverless worker for API jobs or launch it as an interactive pod with both a simple frontend and the full ComfyUI canvas.
 
-- CUDA 13.0.2 primary; CUDA 12.8.1 secondary
-- Ubuntu 24.04 base; CUDA user-space libraries supplied by the pinned PyTorch wheels
-- PyTorch 2.11.0, torchvision 0.26.0, torchaudio 2.11.0
-- ComfyUI v0.33.1 with built-in Manager 4.2.2
-- Comfy CLI 1.16.0 and Hugging Face Hub CLI 1.27.0
-- Official LTX 2.5 nodes plus separate API and editor image-to-video workflows
-- Distilled INT8 ConvRot for Blackwell-efficient inference
+## What you get
 
-## Quickstart
+- LTX 2.5 distilled INT8 inference tuned for modern NVIDIA GPUs
+- A clean web frontend for quick image-to-video generation
+- ComfyUI for visual workflow editing and advanced control
+- A RunPod serverless handler for `/run` and `/runsync`
+- Automatic first-boot model downloads to persistent storage
+- Persistent models, ComfyUI state, Python environment, and caches under `/workspace`
+- Separate workflows for API execution and the ComfyUI editor
+- Live startup checks that catch missing or unindexed models before jobs arrive
 
-1. Accept the model terms on [Lightricks/LTX-2.5](https://huggingface.co/Lightricks/LTX-2.5).
-2. Build and publish the `ltx2-5-distilled-int8` target from [`docker-bake.hcl`](./docker-bake.hcl):
+The recommended image is:
 
-```bash
-docker buildx bake ltx2-5-distilled-int8 \
-  --set 'ltx2-5-distilled-int8.tags=<registry>/<image>:<version>-ltx2.5-distilled-int8-cu130' \
-  --push
+```text
+notrius/ltx-2.5-serverless:cu130
 ```
 
-3. Create a RunPod serverless template using that image and attach a network volume.
-4. Set:
+## Before you deploy
+
+You will need:
+
+- A RunPod GPU with at least **48 GB VRAM** for the default distilled INT8 profile
+- At least **100 GB persistent storage** for models and caches
+- Acceptance of the model terms on [Lightricks/LTX-2.5](https://huggingface.co/Lightricks/LTX-2.5)
+- A Hugging Face access token if the model download requires authenticated access
+
+Set the token as a RunPod secret or environment variable. The image accepts `HF_TOKEN`, `HUGGINGFACE_TOKEN`, or `HUGGINGFACE_ACCESS_TOKEN`.
+
+## Option 1: Run as a serverless worker
+
+Choose this when another application will submit jobs through the RunPod API and you want workers to scale with demand.
+
+### Install the worker
+
+1. Create a RunPod Serverless template.
+2. Use `notrius/ltx-2.5-serverless:cu130` as the container image.
+3. Attach a network volume so downloaded models survive worker replacement.
+4. Add these environment variables:
 
 ```env
-PERSIST_WORKSPACE=true
 RUN_MODE=worker
+PERSIST_WORKSPACE=true
 LTX25_PRELOAD_VARIANT=distilled-int8
 LTX25_PRELOAD_PROMPT_ENHANCER=true
 HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 ```
 
-5. Send the checked-in [LTX 2.5 I2V API workflow](./video_ltx2_5_i2v_API.json) to `/run` or `/runsync` using the [workflow request contract](#api-contract).
+5. Create an endpoint from the template and wait for the first worker to finish downloading the model stack.
 
-The model bootstrap downloads weights to the persistent model root. Model weights are never baked into Docker layers.
+The first cold start is the expensive one. Later workers reuse the models and caches from the attached volume.
 
-## Docker targets
+### Run a worker job
 
-| Target | CUDA | Model profile |
-| --- | --- | --- |
-| `base` | 13.0.2 | No startup preload |
-| `base-cuda12-8-1` | 12.8.1 | No startup preload |
-| `ltx2-5-distilled-int8` | 13.0.2 | Distilled INT8 ConvRot, recommended |
-| `ltx2-5-distilled-int8-cu128` | 12.8.1 | Distilled INT8 ConvRot fallback |
-
-All bake targets build for `linux/amd64`. For a direct Docker build, keep the platform explicit:
-
-```bash
-docker build --platform linux/amd64 --target base -t ltx25-worker:dev .
-```
-
-Image tags follow `<version>-ltx2.5-distilled-int8-cu130` and `<version>-ltx2.5-distilled-int8-cu128`.
-
-## Runtime modes
-
-- `worker`: ComfyUI, bundled frontend, and RunPod serverless handler
-- `local-api`: ComfyUI, frontend, and local RunPod-compatible API on port `8000`
-- `pod`: ComfyUI and frontend without the serverless handler
-
-The frontend is served on port `7777`; ComfyUI uses `8188`.
-
-## API contract
-
-The preferred request shape is below. `workflow` must be an API-format ComfyUI workflow; `{}` is only a structural placeholder.
+Submit the checked-in [LTX 2.5 API workflow](./video_ltx2_5_i2v_API.json) through RunPod `/run` or `/runsync`:
 
 ```json
 {
@@ -81,30 +73,113 @@ The preferred request shape is below. `workflow` must be an API-format ComfyUI w
 }
 ```
 
-The worker returns `output.images[]` and/or `output.videos[]`. Artifacts are inline base64 unless S3 is configured. The older `input.prompt` + `input.image_url` request remains available for existing clients.
+`workflow` must contain a ComfyUI API-format workflow; the empty object above only shows the request structure. Results are returned in `output.images[]` and/or `output.videos[]`. S3 output is supported when configured; otherwise artifacts are returned inline.
 
-## Model layout
+## Option 2: Run as an interactive pod
 
-The default INT8 workflow preloads:
+Choose this when you want to create videos directly, edit workflows in ComfyUI, or inspect the stack interactively.
 
-- `models/diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors`
-- `models/text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors`
-- `models/text_encoders/gemma4_e2b_it_bf16.safetensors`
-- `models/vae/ltx-2.5-video-vae-bf16.safetensors`
-- `models/vae/ltx-2.5-audio-vae-bf16.safetensors`
-- `models/latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors`
+### Install the pod
 
-Start with at least 48 GB VRAM for the distilled INT8 profile and validate the exact workflow before production. Attach at least 100 GB of persistent storage for the default stack and caches.
+The quickest route is the ready-made RunPod template:
 
-## Validation boundary
+[**Deploy the LTX 2.5 Pod template**](https://console.runpod.io/deploy?template=zzlfhm0e3c&ref=o3idfm0n)
 
-The test workflow validates shell scripts, JSON, Python syntax, workflow transformation, payload handling, and Docker bake definitions. A release is not GPU-validated until the image has been built for `linux/amd64`, booted on the target CUDA/GPU class, and completed the checked-in workflow.
+When configuring the pod:
+
+1. Select a GPU with at least 48 GB VRAM.
+2. Attach persistent storage at `/workspace`.
+3. Confirm these environment variables:
+
+```env
+RUN_MODE=pod
+PERSIST_WORKSPACE=true
+LTX25_PRELOAD_VARIANT=distilled-int8
+LTX25_PRELOAD_PROMPT_ENHANCER=true
+HUGGINGFACE_ACCESS_TOKEN=hf_xxx
+```
+
+### Run the pod
+
+After startup, open either service from RunPod:
+
+- **Frontend — port `7777`:** upload an image, write a prompt, choose the duration, and generate
+- **ComfyUI — port `8188`:** edit or run the bundled visual LTX 2.5 workflow
+
+The editor workflow is installed in the ComfyUI user workflow library. The API workflow remains separate for the frontend and serverless handler.
+
+Models download automatically on the first deployment. Startup then verifies that ComfyUI can actually see the transformer, text encoders, VAEs, and latent upscaler—not merely that files exist somewhere on disk looking decorative.
+
+## Persistent storage
+
+`/workspace` is the home of everything worth keeping:
+
+```text
+/workspace/models                    downloaded LTX 2.5 models
+/workspace/worker-comfyui/comfyui    ComfyUI and user state
+/workspace/worker-comfyui/venv       Python environment
+/workspace/worker-comfyui/cache      download and compiler caches
+```
+
+The container links `/comfyui/models` directly to `/workspace/models`. Do not bake model weights into the Docker image; persistent storage keeps the image smaller and avoids downloading the same weights for every replacement worker.
+
+## Build your own image
+
+The public CUDA 13 image is recommended for normal use. To publish your own build:
+
+```bash
+docker buildx bake ltx2-5-distilled-int8 \
+  --set 'ltx2-5-distilled-int8.tags=<registry>/<image>:cu130' \
+  --push
+```
+
+All release targets build for `linux/amd64`. CUDA 13 is the primary Blackwell-first path; CUDA 12.8 is available as a fallback target.
+
+| Target | Purpose |
+| --- | --- |
+| `ltx2-5-distilled-int8` | Recommended CUDA 13 image with automatic model preload |
+| `ltx2-5-distilled-int8-cu128` | CUDA 12.8 fallback with automatic model preload |
+| `base` | CUDA 13 base without model preload |
+| `base-cuda12-8-1` | CUDA 12.8 base without model preload |
+
+## Runtime modes
+
+| Mode | What starts |
+| --- | --- |
+| `worker` | ComfyUI, frontend, and RunPod serverless handler |
+| `pod` | ComfyUI and frontend, without the serverless handler |
+| `local-api` | ComfyUI, frontend, and a local RunPod-compatible API on port `8000` |
+
+## Under the hood
+
+- Ubuntu 24.04
+- PyTorch 2.11 with its packaged CUDA 13 runtime
+- ComfyUI with Manager, Downloader, and the official LTXVideo nodes
+- Distilled INT8 ConvRot transformer and text encoder
+- Official LTX 2.5 video/audio VAEs and latent upscaler
+- Persistent Hugging Face, pip, Torch, and Triton caches
+
+Model weights are downloaded during the first deployment and are not part of the Docker image.
+
+## Production validation
+
+The repository tests workflow transformation, request handling, bootstrap behavior, model discovery, shell/Python syntax, and Docker build definitions. Before treating a custom build as production-ready, boot it on the intended GPU class and complete a real generation using the checked-in workflow.
 
 ## Documentation
 
 - [Deployment](docs/deployment.md)
 - [Configuration](docs/configuration.md)
 - [Network volumes and model paths](docs/network-volumes.md)
+- [Customization](docs/customization.md)
 - [Development](docs/development.md)
 - [CI/CD](docs/ci-cd.md)
-- [Customization](docs/customization.md)
+
+## Support the project
+
+If this image saves you from another evening of CUDA archaeology, you can support continued maintenance here:
+
+[![Sponsor on GitHub](https://img.shields.io/badge/Sponsor%20on-GitHub-24292F?style=for-the-badge&logo=github)](https://github.com/sponsors/vavo) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-vavo-5F7FFF?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/vavo) [![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-FF424D?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/vavo)
+
+## License
+
+MIT — build something useful, and preferably something less temperamental than the average CUDA environment.
