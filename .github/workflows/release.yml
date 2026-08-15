@@ -20,15 +20,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
           cache: pnpm
 
       - name: Install dependencies
@@ -36,7 +36,7 @@ jobs:
 
       - name: Create release PR or detect version commit
         id: changesets
-        uses: changesets/action@v2
+        uses: changesets/action@v1
         with:
           version: pnpm changeset:version
           commit: "chore: version packages"
@@ -80,12 +80,14 @@ jobs:
         target:
           - base
           - base-cuda12-8-1
-          - ltx2-5-distilled-int8
-          - ltx2-5-distilled-int8-cu128
+          - base-cuda13-0
+          - ltx2-3-distilled
+          - ltx2-3-distilled-fp8
+          - ltx2-3-distilled-cuda13
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Clear space to remove unused folders
         run: |
@@ -95,19 +97,19 @@ jobs:
           rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v4
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.target }}
-        uses: docker/bake-action@v7
+        uses: docker/bake-action@v2
         env:
           DOCKERHUB_REPO: ${{ vars.DOCKERHUB_REPO }}
           DOCKERHUB_IMG: ${{ vars.DOCKERHUB_IMG }}
@@ -124,10 +126,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Update description on Docker Hub
-        uses: peter-evans/dockerhub-description@v5
+        uses: peter-evans/dockerhub-description@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

@@ -19,8 +19,9 @@ const form = document.querySelector("#payload-form");
 const promptField = document.querySelector("#prompt");
 const optimizeField = document.querySelector("#optimize-prompt");
 const secondsField = document.querySelector("#seconds");
-const secondsNumberField = document.querySelector("#seconds-number");
+const secondsValue = document.querySelector("#seconds-value");
 const secondsMinLabel = document.querySelector("#seconds-min-label");
+const secondsDefaultLabel = document.querySelector("#seconds-default-label");
 const secondsMaxLabel = document.querySelector("#seconds-max-label");
 const framesValue = document.querySelector("#frames-value");
 const fpsValue = document.querySelector("#fps-value");
@@ -79,22 +80,10 @@ function formatSecondsLabel(seconds) {
 function updateDurationSummary() {
   const seconds = Number.parseFloat(secondsField.value);
   const dimensions = ratioDimensions[state.aspectRatio];
-  secondsNumberField.value = String(seconds);
+  secondsValue.textContent = seconds.toFixed(1);
   framesValue.textContent = String(secondsToFrames(seconds));
   fpsValue.textContent = String(state.fps);
   resolutionValue.textContent = `${dimensions.width} × ${dimensions.height}`;
-}
-
-function updateDurationFromNumber() {
-  const seconds = Number.parseFloat(secondsNumberField.value);
-  if (!Number.isFinite(seconds)) {
-    return;
-  }
-
-  const minimum = Number.parseFloat(secondsField.min);
-  const maximum = Number.parseFloat(secondsField.max);
-  secondsField.value = String(Math.min(maximum, Math.max(minimum, Math.round(seconds))));
-  updateDurationSummary();
 }
 
 function updateAspectButtons() {
@@ -383,11 +372,8 @@ async function initializeConfig() {
   secondsField.max = String(config.seconds.max);
   secondsField.step = String(config.seconds.step);
   secondsField.value = String(config.seconds.default);
-  secondsNumberField.min = String(config.seconds.min);
-  secondsNumberField.max = String(config.seconds.max);
-  secondsNumberField.step = String(config.seconds.step);
-  secondsNumberField.value = String(config.seconds.default);
   secondsMinLabel.textContent = formatSecondsLabel(config.seconds.min);
+  secondsDefaultLabel.textContent = formatSecondsLabel(config.seconds.default);
   secondsMaxLabel.textContent = formatSecondsLabel(config.seconds.max);
   updateSubmitModeUi();
   updateDurationSummary();
@@ -454,7 +440,6 @@ aspectButtons.forEach((button) => {
 
 promptField.addEventListener("input", updatePromptCounter);
 secondsField.addEventListener("input", updateDurationSummary);
-secondsNumberField.addEventListener("input", updateDurationFromNumber);
 copyButton.addEventListener("click", copyPayload);
 downloadButton.addEventListener("click", downloadPayload);
 

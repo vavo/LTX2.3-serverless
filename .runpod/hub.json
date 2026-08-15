@@ -1,23 +1,23 @@
 {
-  "title": "LTX 2.5 ComfyUI Worker",
-  "description": "Run Blackwell-first LTX 2.5 video inference on ComfyUI with persistent /workspace state",
+  "title": "LTX 2.3 ComfyUI Worker",
+  "description": "Run LTX 2.3 video inference on ComfyUI with persistent /workspace state",
   "type": "serverless",
   "category": "image",
   "iconUrl": "https://cpjrphpz3t5wbwfe.public.blob.vercel-storage.com/comfy-ui.png",
   "config": {
     "runsOn": "GPU",
     "containerDiskInGb": 120,
-    "gpuIds": "BLACKWELL_180",
+    "gpuIds": "ADA_24",
     "gpuCount": 1,
-    "allowedCudaVersions": ["13.0", "12.8"],
+    "allowedCudaVersions": ["13.0", "12.8", "12.7", "12.6"],
     "env": [
       {
-        "key": "LTX25_PRELOAD_VARIANT",
+        "key": "LTX23_PRELOAD_VARIANT",
         "input": {
-          "name": "LTX 2.5 Model Profile",
+          "name": "LTX 2.3 Checkpoint",
           "type": "string",
-          "description": "Startup preload profile: distilled-int8",
-          "default": "distilled-int8",
+          "description": "Optional startup preload: distilled, dev, distilled-fp8, or dev-fp8",
+          "default": "distilled",
           "advanced": false
         }
       },
@@ -32,12 +32,12 @@
         }
       },
       {
-        "key": "LTX25_PRELOAD_PROMPT_ENHANCER",
+        "key": "LTX23_PRELOAD_UPSCALERS",
         "input": {
-          "name": "Preload Prompt Enhancer",
+          "name": "Preload Upscalers",
           "type": "boolean",
-          "description": "Also preload the Gemma prompt enhancer used by the bundled workflow",
-          "default": true,
+          "description": "Also preload the official LTX spatial and temporal upscalers into persistent storage",
+          "default": false,
           "advanced": true
         }
       },
@@ -46,23 +46,33 @@
         "input": {
           "name": "Hugging Face Token",
           "type": "string",
-          "description": "Read token with accepted access to the gated LTX 2.5 model",
+          "description": "Optional token for gated or rate-limited model downloads during startup",
           "default": "",
           "advanced": true
         }
       },
       {
-        "key": "AWS_BUCKET_NAME",
+        "key": "COMFY_ORG_API_KEY",
         "input": {
-          "name": "S3 Bucket Name",
+          "name": "Comfy.org API Key",
           "type": "string",
-          "description": "Optional AWS S3 bucket for generated artifacts",
+          "description": "Enter your Comfy.org API key to use API Nodes",
+          "default": "",
+          "advanced": false
+        }
+      },
+      {
+        "key": "BUCKET_ENDPOINT_URL",
+        "input": {
+          "name": "S3 Bucket Endpoint URL",
+          "type": "string",
+          "description": "Upload images to S3 (e.g. https://<bucket>.s3.<region>.amazonaws.com)",
           "default": "",
           "advanced": true
         }
       },
       {
-        "key": "AWS_ACCESS_KEY_ID",
+        "key": "BUCKET_ACCESS_KEY_ID",
         "input": {
           "name": "S3 Access Key ID",
           "type": "string",
@@ -72,7 +82,7 @@
         }
       },
       {
-        "key": "AWS_SECRET_ACCESS_KEY",
+        "key": "BUCKET_SECRET_ACCESS_KEY",
         "input": {
           "name": "S3 Secret Access Key",
           "type": "string",
@@ -82,12 +92,12 @@
         }
       },
       {
-        "key": "AWS_DEFAULT_REGION",
+        "key": "SERVE_API_LOCALLY",
         "input": {
-          "name": "S3 Region",
-          "type": "string",
-          "description": "AWS region for optional S3 artifact uploads",
-          "default": "us-east-1",
+          "name": "Serve API Locally (dev)",
+          "type": "boolean",
+          "description": "Dev only: run a local test API",
+          "default": false,
           "advanced": true
         }
       },
@@ -102,13 +112,43 @@
         }
       },
       {
-        "key": "RUN_MODE",
+        "key": "WEBSOCKET_RECONNECT_ATTEMPTS",
         "input": {
-          "name": "Runtime Mode",
-          "type": "string",
-          "description": "Use worker for RunPod Serverless",
-          "default": "worker",
-          "advanced": false
+          "name": "Websocket Reconnect Attempts",
+          "type": "number",
+          "description": "How many times to retry if the connection drops",
+          "default": 5,
+          "advanced": true
+        }
+      },
+      {
+        "key": "WEBSOCKET_RECONNECT_DELAY_S",
+        "input": {
+          "name": "Websocket Reconnect Delay (s)",
+          "type": "number",
+          "description": "Seconds to wait between reconnect attempts",
+          "default": 3,
+          "advanced": true
+        }
+      },
+      {
+        "key": "WEBSOCKET_TRACE",
+        "input": {
+          "name": "Websocket Trace",
+          "type": "boolean",
+          "description": "Detailed connection logs (debug only)",
+          "default": false,
+          "advanced": true
+        }
+      },
+      {
+        "key": "REFRESH_WORKER",
+        "input": {
+          "name": "Refresh Worker",
+          "type": "boolean",
+          "description": "Restart the worker after each job for a clean state",
+          "default": false,
+          "advanced": true
         }
       }
     ]

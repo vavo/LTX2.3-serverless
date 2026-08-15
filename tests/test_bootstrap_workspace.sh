@@ -24,9 +24,10 @@ EXTRA_MODEL_PATHS_FILE="${TEST_DIR}/extra_model_paths.yaml"
 mkdir -p "${IMAGE_COMFY}/models/checkpoints" "${IMAGE_VENV}/bin" "${IMAGE_APP}" "${RUNTIME_COMFY}" "${RUNTIME_VENV}"
 printf 'seeded comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'seeded venv\n' > "${IMAGE_VENV}/bin/python"
-printf '{\"nodes\":[],\"workflow\":\"seeded editor\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v.json"
-printf '{\"workflow\":\"api only\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v_API.json"
+printf '{\"workflow\":\"seeded\"}\n' > "${IMAGE_APP}/video_ltx2_3_i2v_API.json"
+mkdir -p "${IMAGE_COMFY}/custom_nodes/comfyui-manager"
 mkdir -p "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader"
+printf 'manager present\n' > "${IMAGE_COMFY}/custom_nodes/comfyui-manager/README.txt"
 printf 'downloader present\n' > "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader/README.txt"
 
 run_persistent_bootstrap() {
@@ -66,17 +67,9 @@ run_persistent_bootstrap
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded comfy"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 assert_file_contains "${EXTRA_MODEL_PATHS_FILE}" "base_path: ${WORKSPACE_ROOT}"
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager/README.txt" "manager present"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader present"
-assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v.json" "\"workflow\":\"seeded editor\""
-[ ! -e "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json" ] || {
-    echo "API workflow must not be installed in the ComfyUI user library"
-    exit 1
-}
-[ -L "${RUNTIME_COMFY}/models" ] || { echo "Expected ${RUNTIME_COMFY}/models to be a symlink"; exit 1; }
-[ "$(readlink "${RUNTIME_COMFY}/models")" = "${WORKSPACE_ROOT}/models" ] || {
-    echo "Unexpected ComfyUI model symlink target"
-    exit 1
-}
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_3_i2v_API.json" "\"workflow\":\"seeded\""
 
 for cache_dir in huggingface pip torch triton xdg; do
     [ -d "${WORKSPACE_ROOT}/worker-comfyui/cache/${cache_dir}" ] || {
@@ -87,24 +80,35 @@ done
 
 printf 'mutated comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'mutated venv\n' > "${IMAGE_VENV}/bin/python"
+printf 'manager updated\n' > "${IMAGE_COMFY}/custom_nodes/comfyui-manager/README.txt"
 printf 'downloader updated\n' > "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader/README.txt"
-printf '{\"nodes\":[],\"workflow\":\"updated editor\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v.json"
-printf '{\"workflow\":\"legacy api\"}\n' > "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json"
+printf '{\"workflow\":\"updated\"}\n' > "${IMAGE_APP}/video_ltx2_3_i2v_API.json"
 
 run_persistent_bootstrap
 
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded comfy"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager/README.txt" "manager updated"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader updated"
-assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v.json" "\"workflow\":\"updated editor\""
-[ ! -e "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json" ] || {
-    echo "Expected legacy API workflow to be removed from user library"
-    exit 1
-}
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_3_i2v_API.json" "\"workflow\":\"updated\""
 
+mkdir -p "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager"
+printf 'legacy manager\n' > "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager/README.txt"
+rm -rf "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager"
 rm -rf "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader"
 run_persistent_bootstrap
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager/README.txt" "manager updated"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader updated"
+LEGACY_MANAGER_PATH="${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Manager"
+NORMALIZED_MANAGER_PATH="${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/comfyui-manager"
+if [ -e "${LEGACY_MANAGER_PATH}" ] && [ -e "${NORMALIZED_MANAGER_PATH}" ]; then
+    LEGACY_MANAGER_INODE="$(ls -di "${LEGACY_MANAGER_PATH}" 2>/dev/null | awk '{print $1}' || true)"
+    NORMALIZED_MANAGER_INODE="$(ls -di "${NORMALIZED_MANAGER_PATH}" 2>/dev/null | awk '{print $1}' || true)"
+    if [ -n "${LEGACY_MANAGER_INODE}" ] && [ "${LEGACY_MANAGER_INODE}" != "${NORMALIZED_MANAGER_INODE}" ]; then
+        echo "Expected legacy ComfyUI-Manager path to be removed"
+        exit 1
+    fi
+fi
 
 rm -f "${WORKSPACE_ROOT}/worker-comfyui/venv/.worker-seeded"
 mkdir -p "${WORKSPACE_ROOT}/worker-comfyui/venv/lib/python3.12/site-packages/einops"
@@ -124,7 +128,6 @@ mkdir -p "${LOCAL_RUNTIME_COMFY}/models"
     export PERSIST_WORKSPACE=true
     export COMFY_RUNTIME_ROOT="${LOCAL_RUNTIME_COMFY}"
     export EXTRA_MODEL_PATHS_FILE="${LOCAL_EXTRA_MODEL_PATHS_FILE}"
-    export WORKFLOW_TEMPLATE_SOURCE_ROOT="${IMAGE_APP}"
 
     source "${SCRIPT_TO_TEST}"
     detect_persistent_root() {
@@ -139,7 +142,6 @@ mkdir -p "${LOCAL_RUNTIME_COMFY}/models"
 )
 
 assert_file_contains "${LOCAL_EXTRA_MODEL_PATHS_FILE}" "base_path: ${LOCAL_RUNTIME_COMFY}"
-assert_file_contains "${LOCAL_RUNTIME_COMFY}/user/default/workflows/video_ltx2_5_i2v.json" "\"workflow\":\"updated editor\""
 
 LOCK_DIR="${WORKSPACE_ROOT}/worker-comfyui/.bootstrap.lock"
 mkdir -p "${WORKSPACE_ROOT}/worker-comfyui"

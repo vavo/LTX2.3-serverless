@@ -1,81 +1,159 @@
-# Development and local testing
+# Development and Local Testing
 
-## Prerequisites
+This guide covers setting up your local environment for developing and testing this LTX-focused ComfyUI worker.
 
-- Python 3.12 for parity with the image
-- Node.js 24 and pnpm 11 for release tooling
-- Docker with Buildx
-- An NVIDIA GPU, compatible driver, and NVIDIA Container Toolkit for container runtime tests
+## Setup
 
-macOS can run host-side tests and build `linux/amd64` images through Buildx, but it cannot execute this CUDA worker locally.
+### Prerequisites
 
-## Host-side setup
+1.  Python >= 3.10
+2.  `pip` (Python package installer)
+3.  Virtual environment tool (like `venv`)
+
+### Steps
+
+1.  **Clone the repository** (if you haven't already):
+    ```bash
+    git clone https://github.com/vavo/LTX2.3-serverless.git
+    cd LTX2.3-serverless
+    ```
+2.  **Create a virtual environment**:
+    ```bash
+    python -m venv .venv
+    ```
+3.  **Activate the virtual environment**:
+    - **Windows (Command Prompt/PowerShell)**:
+      ```bash
+      .\.venv\Scripts\activate
+      ```
+    - **macOS / Linux (Bash/Zsh)**:
+      ```bash
+      source ./.venv/bin/activate
+      ```
+4.  **Install dependencies**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### Setup for Windows (using WSL2)
+
+Running Docker with GPU acceleration on Windows typically requires WSL2 (Windows Subsystem for Linux).
+
+1.  **Install WSL2 and a Linux distribution** (like Ubuntu) following [Microsoft's official guide](https://learn.microsoft.com/en-us/windows/wsl/install). You generally don't need the GUI support for this.
+2.  **Open your Linux distribution's terminal** (e.g., open Ubuntu from the Start menu or type `wsl` in Command Prompt/PowerShell).
+3.  **Update packages** inside WSL:
+    ```bash
+    sudo apt update && sudo apt upgrade -y
+    ```
+4.  **Install Docker Engine in WSL**:
+    - Follow the [official Docker installation guide for your chosen Linux distribution](https://docs.docker.com/engine/install/#server) (e.g., Ubuntu).
+    - **Important:** Add your user to the `docker` group to avoid using `sudo` for every Docker command: `sudo usermod -aG docker $USER`. You might need to close and reopen the terminal for this to take effect.
+5.  **Install Docker Compose** (if not included with Docker Engine):
+    ```bash
+    sudo apt-get update
+    sudo apt-get install docker-compose-plugin # Or use the standalone binary method if preferred
+    ```
+6.  **Install NVIDIA Container Toolkit in WSL**:
+    - Follow the [NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), ensuring you select the correct steps for your Linux distribution running inside WSL.
+    - Configure Docker to use the NVIDIA runtime as default if desired, or specify it when running containers.
+7.  **Enable GPU Acceleration in WSL**:
+    - Ensure you have the latest NVIDIA drivers installed on your Windows host machine.
+    - Follow the [NVIDIA guide for CUDA on WSL](https://docs.nvidia.com/cuda/wsl-user-guide/index.html).
+
+After completing these steps, you should be able to run Docker commands, including `docker-compose`, from within your WSL terminal with GPU access.
+
+> [!NOTE]
+>
+> - It is generally recommended to run the Docker commands (`docker build`, `docker-compose up`) from within the WSL environment terminal for consistency with the Linux-based container environment.
+> - Accessing `localhost` URLs (like the local API or ComfyUI) from your Windows browser while the service runs inside WSL usually works, but network configurations can sometimes cause issues.
+
+## Testing the RunPod Handler
+
+Unit tests are provided to verify the core logic of the `handler.py`.
+
+- **Run all tests**:
+  ```bash
+  python -m unittest discover tests/
+  ```
+- **Run a specific test file**:
+  ```bash
+  python -m unittest tests.test_handler
+  ```
+- **Run a specific test case or method**:
+
+  ```bash
+  # Example: Run all tests in the TestRunpodWorkerComfy class
+  python -m unittest tests.test_handler.TestRunpodWorkerComfy
+
+  # Example: Run a single test method
+  python -m unittest tests.test_handler.TestRunpodWorkerComfy.test_s3_upload
+  ```
+
+## Testing the Bootstrap Scripts
+
+The persistence and LTX preload paths are covered by shell tests and do not depend on the legacy [`test_input.json`](../test_input.json) payload.
+
+- **Run all shell tests**:
+  ```bash
+  bash tests/test_restore_snapshot.sh
+  bash tests/test_bootstrap_workspace.sh
+  bash tests/test_bootstrap_ltx23.sh
+  ```
+
+## Local API Simulation (using Docker Compose)
+
+For enhanced local development and end-to-end testing, you can start a local environment using Docker Compose that includes the worker and a ComfyUI instance.
+
+> [!IMPORTANT]
+>
+> - This currently requires an **NVIDIA GPU** and correctly configured drivers + NVIDIA Container Toolkit (see Windows setup above if applicable).
+> - Ensure Docker is running.
+
+**Steps:**
+
+1.  **Set Environment Variable (Optional but Recommended):**
+    - While the `docker-compose.yml` currently sets `SERVE_API_LOCALLY=true` by default, the cleaner setting is `RUN_MODE=local-api`.
+    - If you modify the compose file or use an `.env` file, prefer setting `RUN_MODE=local-api` explicitly.
+2.  **Start the services**:
+    ```bash
+    # From the project root directory
+    docker-compose up --build
+    ```
+    - The `--build` flag ensures the image is built locally using the current state of the code and `Dockerfile`.
+    - This will start the worker container, which in turn starts ComfyUI, the local RunPod API shim, and the bundled frontend.
+
+### Access the Local Worker API
+
+- With the Docker Compose stack running, the worker's simulated RunPod API is accessible at: [http://localhost:8000](http://localhost:8000)
+- You can send POST requests to `http://localhost:8000/run` or `http://localhost:8000/runsync` with the same JSON payload structure expected by the RunPod endpoint.
+- Opening [http://localhost:8000/docs](http://localhost:8000/docs) in your browser will show the FastAPI auto-generated documentation (Swagger UI), allowing you to interact with the API directly.
+
+### Access the Local Frontend
+
+- The bundled payload-builder frontend auto-starts in the same container and is accessible at: [http://localhost:7777](http://localhost:7777)
+- You can disable it by setting `LTX_FRONTEND_ENABLED=false` if you only want the worker and ComfyUI.
+
+## Pod-Oriented Local Boot
+
+If you want to simulate a plain pod rather than the local RunPod API shim, set:
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-corepack enable
-pnpm install --frozen-lockfile
+RUN_MODE=pod
 ```
 
-```bash
-git clone https://github.com/vavo/LTX2.5-serverless.git
-cd LTX2.5-serverless
-```
+That starts:
 
-## Tests
+- ComfyUI on `8188`
+- the frontend on `7777`
 
-Run the same host-safe validation used by CI:
+and skips the serverless handler entirely.
 
-```bash
-bash -n src/*.sh scripts/*.sh tests/*.sh
-bash tests/test_restore_snapshot.sh
-bash tests/test_bootstrap_workspace.sh
-bash tests/test_bootstrap_ltx25.sh
+### Access Local ComfyUI
 
-python3 -m unittest \
-  tests.test_ltx_payload_builder \
-  tests.test_ltx25_workflow \
-  tests.test_verify_comfy_models \
-  tests.test_workflow_support \
-  -v
+- The underlying ComfyUI instance running in the `comfyui` container is accessible directly at: [http://localhost:8188](http://localhost:8188)
+- This is useful for debugging workflows or observing the ComfyUI state while testing the worker.
 
-python3 -m json.tool .runpod/hub.json >/dev/null
-python3 -m json.tool video_ltx2_5_i2v_API.json >/dev/null
-docker buildx bake --print ltx2-5-distilled-int8 >/dev/null
-docker buildx bake --print ltx2-5-distilled-int8-cu128 >/dev/null
-```
+### Stopping the Local Environment
 
-`tests/test_handler.py` and `tests/test_frontend_app.py` are legacy integration-oriented modules and are not part of the current CI gate. Do not claim the full `unittest discover` suite passes unless those dependencies and mocks have been repaired.
-
-## Local GPU stack
-
-All runtime source files are copied into the image; there is no source bind mount. Rebuild after changing Python or shell code:
-
-```bash
-docker compose down
-docker build --platform linux/amd64 --target base -t ltx25-worker:dev .
-docker compose up
-```
-
-The compose service uses `RUN_MODE=local-api` and exposes:
-
-- RunPod-compatible local API: `http://localhost:8000`
-- ComfyUI: `http://localhost:8188`
-- Bundled frontend: `http://localhost:7777`
-
-Its persistent data is stored under `./data/runpod-volume`. Set the LTX preload variables in an override file or environment if the local volume does not already contain the model stack.
-
-## GPU release gate
-
-Before publishing a release:
-
-1. Build the exact bake target for `linux/amd64`.
-2. Boot it on the intended Blackwell GPU and CUDA-compatible driver.
-3. Confirm the preload is reused after restart.
-4. Run the checked-in I2V workflow through the handler.
-5. Verify the returned video and S3 mode if enabled.
-6. Repeat on the CUDA 12.8 target only if that fallback will be published.
-
-Passing host tests proves the plumbing is coherent. It does not prove a 22B video model fits, starts, or renders on a GPU that was never involved.
+- Press `Ctrl+C` in the terminal where `docker-compose up` is running.
+- To ensure containers are removed, you can run: `docker-compose down`

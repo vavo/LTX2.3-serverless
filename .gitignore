@@ -15,7 +15,6 @@ __pycache__/
 *.pyo
 *.pyd
 node_modules
-.pnpm-store/
 .buildx-cache/
 
 # Python/test junk

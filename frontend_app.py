@@ -41,7 +41,7 @@ COMFY_INPUT_DIR = os.environ.get("COMFY_INPUT_DIR", "/comfyui/input")
 LOCAL_COMFY_NODE = os.environ.get("LOCAL_COMFY_NODE", "127.0.0.1:8188").strip()
 POD_SUBMIT_JOBS: dict[str, dict[str, Any]] = {}
 
-app = FastAPI(title="LTX 2.5 Payload Builder")
+app = FastAPI(title="LTX 2.3 Payload Builder")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="static")
 
 

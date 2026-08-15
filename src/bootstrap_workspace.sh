@@ -221,7 +221,7 @@ sync_directory_entries_if_missing() {
 
 custom_node_should_refresh() {
     local entry_name="$1"
-    local refresh_list=",${COMFY_BOOTSTRAP_REFRESH_CUSTOM_NODES:-ComfyUI-Downloader},"
+    local refresh_list=",${COMFY_BOOTSTRAP_REFRESH_CUSTOM_NODES:-comfyui-manager,ComfyUI-Downloader},"
 
     case "${refresh_list}" in
         *,"${entry_name}",*)
@@ -231,6 +231,28 @@ custom_node_should_refresh() {
             return 1
             ;;
     esac
+}
+
+remove_legacy_manager_path_if_distinct() {
+    local target_dir="$1"
+    local legacy_dir="${target_dir}/ComfyUI-Manager"
+    local normalized_dir="${target_dir}/comfyui-manager"
+    local legacy_inode=""
+    local normalized_inode=""
+
+    if [ ! -e "${legacy_dir}" ]; then
+        return
+    fi
+
+    legacy_inode="$(ls -di "${legacy_dir}" 2>/dev/null | awk '{print $1}' || true)"
+    normalized_inode="$(ls -di "${normalized_dir}" 2>/dev/null | awk '{print $1}' || true)"
+
+    if [ -n "${normalized_inode}" ] && [ "${legacy_inode}" = "${normalized_inode}" ]; then
+        return
+    fi
+
+    bootstrap_log "Removing legacy custom node path ${legacy_dir}"
+    rm -rf "${legacy_dir}"
 }
 
 sync_custom_nodes_from_image() {
@@ -251,6 +273,9 @@ sync_custom_nodes_from_image() {
 
         if custom_node_should_refresh "${entry_name}"; then
             bootstrap_log "Refreshing image-baked custom node ${entry_name} in persisted workspace"
+            if [ "${entry_name}" = "comfyui-manager" ]; then
+                remove_legacy_manager_path_if_distinct "${target_dir}"
+            fi
             rm -rf "${target_dir}/${entry_name}"
             cp -a "${entry}" "${target_dir}/${entry_name}"
             continue
@@ -286,16 +311,6 @@ sync_named_files_from_image() {
         bootstrap_log "Refreshing image-baked workflow ${entry_name} in persisted workspace"
         cp -f "${source_dir}/${entry_name}" "${target_dir}/${entry_name}"
     done
-}
-
-remove_legacy_api_workflow() {
-    local workflow_target_dir="$1"
-    local legacy_workflow="${workflow_target_dir}/video_ltx2_5_i2v_API.json"
-
-    if [ -f "${legacy_workflow}" ]; then
-        bootstrap_log "Removing legacy API-format workflow from ComfyUI user library"
-        rm -f "${legacy_workflow}"
-    fi
 }
 
 write_extra_model_paths() {
@@ -345,12 +360,6 @@ bootstrap_workspace() {
         bootstrap_log "No persistent workspace mount detected; using image-local paths"
         export PATH="${venv_runtime_root}/bin:${PATH}"
         export COMFY_MODEL_ROOT="${COMFY_MODEL_ROOT:-${comfy_runtime_root}/models}"
-        workflow_target_dir="${comfy_runtime_root}/${workflow_target_dir_rel}"
-        remove_legacy_api_workflow "${workflow_target_dir}"
-        sync_named_files_from_image \
-            "${workflow_template_source_root}" \
-            "${workflow_target_dir}" \
-            "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_5_i2v.json}"
         write_extra_model_paths "${comfy_runtime_root}" "${extra_model_paths_file}"
         return
     fi
@@ -381,18 +390,16 @@ bootstrap_workspace() {
     sync_custom_nodes_from_image \
         "${comfy_image_root}/custom_nodes" \
         "${comfy_root}/custom_nodes"
-    remove_legacy_api_workflow "${workflow_target_dir}"
     sync_named_files_from_image \
         "${workflow_template_source_root}" \
         "${workflow_target_dir}" \
-        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_5_i2v.json}"
+        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_3_i2v_API.json}"
 
     trap - RETURN
     release_bootstrap_lock "${bootstrap_lock_dir}"
 
     replace_with_symlink "${comfy_runtime_root}" "${comfy_root}"
     replace_with_symlink "${venv_runtime_root}" "${venv_root}"
-    replace_with_symlink "${comfy_runtime_root}/models" "${WORKSPACE_ROOT}/models"
 
     export PATH="${venv_runtime_root}/bin:${PATH}"
     export HF_HOME="${cache_root}/huggingface"

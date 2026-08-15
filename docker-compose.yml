@@ -1,6 +1,6 @@
 services:
   comfyui-worker:
-    image: ltx25-worker:dev
+    image: ltx23-worker:dev
     pull_policy: never
     deploy:
       resources:

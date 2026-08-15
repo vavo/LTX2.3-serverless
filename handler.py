@@ -52,18 +52,12 @@ MAX_INLINE_VIDEO_MB = int(os.environ.get("MAX_INLINE_VIDEO_MB", "50"))
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL_SECONDS", "604800"))
 
 try:
-    with open('video_ltx2_5_i2v_API.json', 'r') as f:
+    with open('video_ltx2_3_i2v_API.json', 'r') as f:
         BASE_WORKFLOW = json.load(f)
 except:
     raise RuntimeError("Worker cannot start without workflow JSON.")
 
-NODE_MAP = {
-    "image": "395",
-    "prompt": "398:376",
-    "seed1": "398:338",
-    "seed2": "398:339",
-    "output": "75",
-}
+NODE_MAP = {"image": "269", "prompt": "267:266", "seed1": "267:216", "seed2": "267:237", "output": "75"}
 
 # --- 2. ADVANCED AI LOGIC ---
 class AIEngine:

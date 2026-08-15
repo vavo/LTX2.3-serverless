@@ -350,31 +350,6 @@ button {
   font-weight: 700;
 }
 
-.duration-input {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--accent);
-  font-size: 1.18rem;
-  font-weight: 700;
-}
-
-.duration-input input {
-  width: 64px;
-  border: 1px solid rgba(109, 245, 225, 0.35);
-  border-radius: 8px;
-  padding: 6px 8px;
-  background: rgba(7, 14, 29, 0.72);
-  color: var(--accent);
-  font: inherit;
-  text-align: right;
-}
-
-.duration-input input:focus {
-  border-color: var(--accent);
-  outline: none;
-}
-
 .setting-meta,
 .metric-label,
 .range-markers,

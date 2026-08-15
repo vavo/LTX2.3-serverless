@@ -3,7 +3,7 @@ variable "DOCKERHUB_REPO" {
 }
 
 variable "DOCKERHUB_IMG" {
-  default = "ltx25-worker"
+  default = "ltx23-worker"
 }
 
 variable "RELEASE_VERSION" {
@@ -11,19 +11,28 @@ variable "RELEASE_VERSION" {
 }
 
 variable "COMFYUI_VERSION" {
-  default = "v0.33.1"
+  default = "latest"
 }
 
-variable "COMFY_CLI_VERSION" {
-  default = "1.16.0"
+# Global defaults for standard CUDA 12.8.1 images
+variable "BASE_IMAGE" {
+  default = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
 }
 
-variable "LTX_VIDEO_REF" {
-  default = "ac4d99839020b983e956a8ab67ec38aec1b6e65a"
+variable "CUDA_VERSION_FOR_COMFY" {
+  default = ""
 }
 
-variable "COMFYUI_DOWNLOADER_REF" {
-  default = "03146df738191004a8aad8264dca5c3530907f56"
+variable "ENABLE_PYTORCH_UPGRADE" {
+  default = "true"
+}
+
+variable "PYTORCH_INDEX_URL" {
+  default = "https://download.pytorch.org/whl/cu128"
+}
+
+variable "PYTORCH_PACKAGES" {
+  default = "torch torchvision torchaudio"
 }
 
 variable "EXTRA_PYTHON_PACKAGES" {
@@ -34,73 +43,174 @@ variable "EXTRA_PYTHON_INDEX_URL" {
   default = ""
 }
 
-group "default" {
-  targets = [
-    "base",
-    "base-cuda12-8-1",
-    "ltx2-5-distilled-int8",
-    "ltx2-5-distilled-int8-cu128",
-  ]
+variable "INSTALL_LTX_VIDEO_NODES" {
+  default = "false"
 }
 
-target "common" {
+variable "LTX_VIDEO_REF" {
+  default = "master"
+}
+
+variable "INSTALL_COMFYUI_MANAGER" {
+  default = "true"
+}
+
+variable "COMFYUI_MANAGER_REF" {
+  default = "main"
+}
+
+variable "LTX23_PRELOAD_VARIANT" {
+  default = ""
+}
+
+variable "LTX23_PRELOAD_UPSCALERS" {
+  default = "false"
+}
+
+group "default" {
+  targets = ["base", "base-cuda12-8-1", "base-cuda13-0", "ltx2-3-distilled", "ltx2-3-distilled-fp8", "ltx2-3-distilled-cuda13"]
+}
+
+target "base" {
   context = "."
   dockerfile = "Dockerfile"
   target = "base"
   platforms = ["linux/amd64"]
   args = {
+    BASE_IMAGE = "${BASE_IMAGE}"
     COMFYUI_VERSION = "${COMFYUI_VERSION}"
-    COMFY_CLI_VERSION = "${COMFY_CLI_VERSION}"
-    PYTORCH_PACKAGES = "torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0"
-    INSTALL_LTX_VIDEO_NODES = "true"
-    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
-    INSTALL_COMFYUI_DOWNLOADER = "true"
-    COMFYUI_DOWNLOADER_REF = "${COMFYUI_DOWNLOADER_REF}"
+    CUDA_VERSION_FOR_COMFY = "${CUDA_VERSION_FOR_COMFY}"
+    ENABLE_PYTORCH_UPGRADE = "${ENABLE_PYTORCH_UPGRADE}"
+    PYTORCH_INDEX_URL = "${PYTORCH_INDEX_URL}"
+    PYTORCH_PACKAGES = "${PYTORCH_PACKAGES}"
     EXTRA_PYTHON_PACKAGES = "${EXTRA_PYTHON_PACKAGES}"
     EXTRA_PYTHON_INDEX_URL = "${EXTRA_PYTHON_INDEX_URL}"
+    INSTALL_LTX_VIDEO_NODES = "${INSTALL_LTX_VIDEO_NODES}"
+    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
+    INSTALL_COMFYUI_MANAGER = "${INSTALL_COMFYUI_MANAGER}"
+    COMFYUI_MANAGER_REF = "${COMFYUI_MANAGER_REF}"
+    LTX23_PRELOAD_VARIANT = "${LTX23_PRELOAD_VARIANT}"
+    LTX23_PRELOAD_UPSCALERS = "${LTX23_PRELOAD_UPSCALERS}"
   }
-}
-
-target "cuda130" {
-  inherits = ["common"]
-  args = {
-    BASE_IMAGE = "ubuntu:24.04"
-    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu130"
-  }
-}
-
-target "cuda128" {
-  inherits = ["common"]
-  args = {
-    BASE_IMAGE = "ubuntu:24.04"
-    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu128"
-  }
-}
-
-target "base" {
-  inherits = ["cuda130"]
   tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-base"]
 }
 
 target "base-cuda12-8-1" {
-  inherits = ["cuda128"]
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "base"
+  platforms = ["linux/amd64"]
+  args = {
+    BASE_IMAGE = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
+    COMFYUI_VERSION = "${COMFYUI_VERSION}"
+    CUDA_VERSION_FOR_COMFY = ""
+    ENABLE_PYTORCH_UPGRADE = "true"
+    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+    PYTORCH_PACKAGES = "${PYTORCH_PACKAGES}"
+    EXTRA_PYTHON_PACKAGES = "${EXTRA_PYTHON_PACKAGES}"
+    EXTRA_PYTHON_INDEX_URL = "${EXTRA_PYTHON_INDEX_URL}"
+    INSTALL_LTX_VIDEO_NODES = "${INSTALL_LTX_VIDEO_NODES}"
+    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
+    INSTALL_COMFYUI_MANAGER = "${INSTALL_COMFYUI_MANAGER}"
+    COMFYUI_MANAGER_REF = "${COMFYUI_MANAGER_REF}"
+    LTX23_PRELOAD_VARIANT = "${LTX23_PRELOAD_VARIANT}"
+    LTX23_PRELOAD_UPSCALERS = "${LTX23_PRELOAD_UPSCALERS}"
+  }
   tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-base-cuda12.8.1"]
 }
 
-target "ltx2-5-distilled-int8" {
-  inherits = ["cuda130"]
+target "base-cuda13-0" {
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "base"
+  platforms = ["linux/amd64"]
   args = {
-    LTX25_PRELOAD_VARIANT = "distilled-int8"
-    LTX25_PRELOAD_PROMPT_ENHANCER = "true"
+    BASE_IMAGE = "nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04"
+    COMFYUI_VERSION = "${COMFYUI_VERSION}"
+    CUDA_VERSION_FOR_COMFY = ""
+    ENABLE_PYTORCH_UPGRADE = "true"
+    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu130"
+    PYTORCH_PACKAGES = "${PYTORCH_PACKAGES}"
+    EXTRA_PYTHON_PACKAGES = "${EXTRA_PYTHON_PACKAGES}"
+    EXTRA_PYTHON_INDEX_URL = "${EXTRA_PYTHON_INDEX_URL}"
+    INSTALL_LTX_VIDEO_NODES = "${INSTALL_LTX_VIDEO_NODES}"
+    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
+    INSTALL_COMFYUI_MANAGER = "${INSTALL_COMFYUI_MANAGER}"
+    COMFYUI_MANAGER_REF = "${COMFYUI_MANAGER_REF}"
+    LTX23_PRELOAD_VARIANT = "${LTX23_PRELOAD_VARIANT}"
+    LTX23_PRELOAD_UPSCALERS = "${LTX23_PRELOAD_UPSCALERS}"
   }
-  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-ltx2.5-distilled-int8-cu130"]
+  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-base-cuda13.0"]
 }
 
-target "ltx2-5-distilled-int8-cu128" {
-  inherits = ["cuda128"]
+target "ltx2-3-distilled" {
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "base"
+  platforms = ["linux/amd64"]
   args = {
-    LTX25_PRELOAD_VARIANT = "distilled-int8"
-    LTX25_PRELOAD_PROMPT_ENHANCER = "true"
+    BASE_IMAGE = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
+    COMFYUI_VERSION = "${COMFYUI_VERSION}"
+    CUDA_VERSION_FOR_COMFY = ""
+    ENABLE_PYTORCH_UPGRADE = "true"
+    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+    PYTORCH_PACKAGES = "${PYTORCH_PACKAGES}"
+    EXTRA_PYTHON_PACKAGES = "${EXTRA_PYTHON_PACKAGES}"
+    EXTRA_PYTHON_INDEX_URL = "${EXTRA_PYTHON_INDEX_URL}"
+    INSTALL_LTX_VIDEO_NODES = "true"
+    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
+    INSTALL_COMFYUI_MANAGER = "${INSTALL_COMFYUI_MANAGER}"
+    COMFYUI_MANAGER_REF = "${COMFYUI_MANAGER_REF}"
+    LTX23_PRELOAD_VARIANT = "distilled"
+    LTX23_PRELOAD_UPSCALERS = "${LTX23_PRELOAD_UPSCALERS}"
   }
-  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-ltx2.5-distilled-int8-cu128"]
+  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-ltx2.3-distilled-cu128"]
+}
+
+target "ltx2-3-distilled-fp8" {
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "base"
+  platforms = ["linux/amd64"]
+  args = {
+    BASE_IMAGE = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
+    COMFYUI_VERSION = "${COMFYUI_VERSION}"
+    CUDA_VERSION_FOR_COMFY = ""
+    ENABLE_PYTORCH_UPGRADE = "true"
+    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu128"
+    PYTORCH_PACKAGES = "${PYTORCH_PACKAGES}"
+    EXTRA_PYTHON_PACKAGES = "${EXTRA_PYTHON_PACKAGES}"
+    EXTRA_PYTHON_INDEX_URL = "${EXTRA_PYTHON_INDEX_URL}"
+    INSTALL_LTX_VIDEO_NODES = "true"
+    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
+    INSTALL_COMFYUI_MANAGER = "${INSTALL_COMFYUI_MANAGER}"
+    COMFYUI_MANAGER_REF = "${COMFYUI_MANAGER_REF}"
+    LTX23_PRELOAD_VARIANT = "distilled-fp8"
+    LTX23_PRELOAD_UPSCALERS = "${LTX23_PRELOAD_UPSCALERS}"
+  }
+  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-ltx2.3-distilled-fp8-cu128"]
+}
+
+target "ltx2-3-distilled-cuda13" {
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "base"
+  platforms = ["linux/amd64"]
+  args = {
+    BASE_IMAGE = "nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04"
+    COMFYUI_VERSION = "${COMFYUI_VERSION}"
+    CUDA_VERSION_FOR_COMFY = ""
+    ENABLE_PYTORCH_UPGRADE = "true"
+    PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu130"
+    PYTORCH_PACKAGES = "${PYTORCH_PACKAGES}"
+    EXTRA_PYTHON_PACKAGES = "${EXTRA_PYTHON_PACKAGES}"
+    EXTRA_PYTHON_INDEX_URL = "${EXTRA_PYTHON_INDEX_URL}"
+    INSTALL_LTX_VIDEO_NODES = "true"
+    LTX_VIDEO_REF = "${LTX_VIDEO_REF}"
+    INSTALL_COMFYUI_MANAGER = "${INSTALL_COMFYUI_MANAGER}"
+    COMFYUI_MANAGER_REF = "${COMFYUI_MANAGER_REF}"
+    LTX23_PRELOAD_VARIANT = "distilled"
+    LTX23_PRELOAD_UPSCALERS = "${LTX23_PRELOAD_UPSCALERS}"
+  }
+  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-ltx2.3-distilled-cu130"]
 }

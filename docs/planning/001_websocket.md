@@ -1,9 +1,5 @@
 # Websocket Runtime Plan
 
-> [!IMPORTANT]
->
-> Unimplemented proposal. The current handler polls ComfyUI history over HTTP and does not support the WebSocket environment variables described below. Use the [configuration guide](../configuration.md) for supported runtime settings.
-
 ## Goal
 
 Replace ComfyUI `/history/{prompt_id}` polling with websocket-based execution tracking in the current Python runtime without regressing:
@@ -252,7 +248,7 @@ Run local Docker validation after implementation:
 
 ```bash
 docker-compose down
-docker build --target base --platform linux/amd64 -t ltx25-worker:dev .
+docker build --target base --platform linux/amd64 -t ltx23-worker:dev .
 docker-compose up -d
 ```
 
