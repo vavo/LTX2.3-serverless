@@ -15,6 +15,7 @@ Use the hub metadata in `.runpod/hub.json` when publishing this template to RunP
 - Pinned ComfyUI v0.33.1 with built-in Manager and persistent `/workspace` bootstrap
 - Official `ComfyUI-LTXVideo` custom nodes
 - Optional startup preload for the complete LTX 2.5 local workflow stack
+- Ubuntu 24.04 base with CUDA user-space libraries supplied by PyTorch
 - CUDA 13.0 as the Blackwell-first default, with CUDA 12.8 as the only fallback
 
 ## Recommended deployment shape

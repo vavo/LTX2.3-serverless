@@ -5,6 +5,7 @@ Blackwell-first LTX 2.5 inference on ComfyUI and RunPod, with persistent models,
 ## Stack
 
 - CUDA 13.0.2 primary; CUDA 12.8.1 secondary
+- Ubuntu 24.04 base; CUDA user-space libraries supplied by the pinned PyTorch wheels
 - PyTorch 2.11.0, torchvision 0.26.0, torchaudio 2.11.0
 - ComfyUI v0.33.1 with built-in Manager 4.2.2
 - Comfy CLI 1.16.0 and Hugging Face Hub CLI 1.27.0

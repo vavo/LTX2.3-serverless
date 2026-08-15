@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG BASE_IMAGE=nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04
+ARG BASE_IMAGE=ubuntu:24.04
 
 FROM ${BASE_IMAGE} AS base
 
@@ -28,6 +28,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
         ffmpeg \
         git \
         libgl1 \
@@ -89,7 +90,8 @@ COPY src/extra_model_paths.yaml ./extra_model_paths.yaml
 WORKDIR /
 COPY src/start.sh src/bootstrap_workspace.sh src/bootstrap_ltx25.sh src/network_volume.py handler.py workflow_support.py frontend_app.py ltx_payload_builder.py video_ltx2_5_i2v_API.json test_input.json ./
 COPY frontend /frontend
-COPY scripts/comfy-node-install.sh scripts/comfy-manager-set-mode.sh /usr/local/bin/
+COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
+COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x \
         /start.sh \
         /bootstrap_workspace.sh \

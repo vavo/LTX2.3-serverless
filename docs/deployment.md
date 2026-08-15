@@ -2,6 +2,8 @@
 
 Deploy the CUDA 13.0 LTX 2.5 image as the primary path. Keep the CUDA 12.8 tag only for environments where the cu130 image cannot run.
 
+Both targets use an Ubuntu 24.04 base. Their pinned PyTorch wheels install the selected CUDA user-space runtime; RunPod supplies the compatible NVIDIA host driver through the container runtime.
+
 ## 1. Build and publish
 
 The repository does not prove that any public image tag has already been published. Build and push to a registry you control:

@@ -60,6 +60,9 @@ jobs:
 
       - name: Validate Docker bake targets
         run: |
-          docker buildx bake --print base >/dev/null
-          docker buildx bake --print ltx2-5-distilled-int8 >/dev/null
-          docker buildx bake --print ltx2-5-distilled-int8-cu128 >/dev/null
+          docker buildx bake --print base | tee /tmp/base-bake.json >/dev/null
+          docker buildx bake --print ltx2-5-distilled-int8 | tee /tmp/cu130-bake.json >/dev/null
+          docker buildx bake --print ltx2-5-distilled-int8-cu128 | tee /tmp/cu128-bake.json >/dev/null
+          grep -q 'ubuntu:24.04' /tmp/base-bake.json
+          grep -q 'download.pytorch.org/whl/cu130' /tmp/cu130-bake.json
+          grep -q 'download.pytorch.org/whl/cu128' /tmp/cu128-bake.json

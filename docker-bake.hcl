@@ -64,7 +64,7 @@ target "common" {
 target "cuda130" {
   inherits = ["common"]
   args = {
-    BASE_IMAGE = "nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04"
+    BASE_IMAGE = "ubuntu:24.04"
     PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu130"
   }
 }
@@ -72,7 +72,7 @@ target "cuda130" {
 target "cuda128" {
   inherits = ["common"]
   args = {
-    BASE_IMAGE = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
+    BASE_IMAGE = "ubuntu:24.04"
     PYTORCH_INDEX_URL = "https://download.pytorch.org/whl/cu128"
   }
 }
