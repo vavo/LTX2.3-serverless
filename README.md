@@ -1,5 +1,7 @@
 # LTX 2.5 for RunPod
 
+[![Runpod](https://api.runpod.io/badge/vavo/LTX2.5-serverless)](https://console.runpod.io/hub/listing/vavo/LTX2.5-serverless)
+
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-vavo-5F7FFF?style=for-the-badge&logo=buy-me-a-coffee&logoColor=white)](https://www.buymeacoffee.com/vavo) [![Sponsor on GitHub](https://img.shields.io/badge/Sponsor%20on-GitHub-24292F?style=for-the-badge&logo=github)](https://github.com/sponsors/vavo) [![Support on Patreon](https://img.shields.io/badge/Support%20on-Patreon-FF424D?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/vavo)
 
 Generate LTX 2.5 image-to-video on RunPod without rebuilding the same GPU environment every time. Use it as a serverless worker for API jobs or launch it as an interactive pod with both a simple frontend and the full ComfyUI canvas.
