@@ -1,108 +1,63 @@
-# Introduction
+# Project conventions
 
-This project runs [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a RunPod serverless worker focused on LTX 2.5 video inference.
+This repository packages ComfyUI as a RunPod worker for LTX 2.5. CUDA 13.0 is the primary path; CUDA 12.8 is the only fallback.
 
-It packages ComfyUI into Docker images, manages job handling via the `runpod` SDK, uses websockets for efficient communication with ComfyUI, and facilitates configuration through environment variables.
+## Runtime design
 
-## Why This Exists
+- Docker images contain code, pinned dependencies, ComfyUI, and required custom nodes.
+- Model weights, ComfyUI state, the Python venv, and caches persist under `/workspace`.
+- The recommended target is `ltx2-5-distilled-int8` on CUDA 13.0.
+- The checked-in API workflow is [`video_ltx2_5_i2v_API.json`](../video_ltx2_5_i2v_API.json).
+- ComfyUI Manager is forced offline at startup. Bake custom nodes into the image.
 
-- Builds LTX-oriented Docker targets for RunPod serverless.
-- Uses Python 3.12 and a persistent `/workspace` bootstrap for ComfyUI, the venv, and caches.
-- Installs the official `ComfyUI-LTXVideo` nodes in the LTX image targets.
-- Targets CUDA 12.8 by default and CUDA 13 experimentally for newer Blackwell-oriented deployments.
-- Can preload the complete local LTX 2.5 workflow stack into persistent storage.
-- Can also preload the official latent upscalers and distilled LoRA for the two-stage distilled path.
+## Docker
 
-## Why It Wins
+RunPod images must be built for `linux/amd64`:
 
-LTX 2.5 is interesting. Rebuilding Comfy, reinstalling nodes, and redownloading weights on every serverless boot is not.
+```bash
+docker build --platform linux/amd64 --target base -t ltx25-worker:dev .
+```
 
-This repo optimizes the boring part:
-- Keep the expensive state on `/workspace`
-- Use a sane CUDA matrix for newer Nvidia cards
-- Make RunPod serverless usable for LTX workflows without turning deployment into a ritual
+Prefer bake targets for release images. Do not bake large model weights into layers; use the persistent model root described in [Network volumes and model paths](network-volumes.md).
 
-# Project Conventions and Rules
+Runtime files are copied into the image, so handler and startup changes require a rebuild before container testing.
 
-This document outlines the key operational and structural conventions for the project. While there are no strict code-style rules enforced by linters currently, following these conventions ensures consistency and smooth development/deployment.
+## API
 
-## 1. Configuration
+New integrations use:
 
-- **Environment Variables:** All external configurations (e.g., AWS S3 credentials, RunPod behavior modifications like `REFRESH_WORKER`) **must** be managed via environment variables.
-- Refer to the main `README.md` sections "Config" and "Upload image to AWS S3" for details on available variables.
+```json
+{
+  "input": {
+    "workflow": {},
+    "images": []
+  }
+}
+```
 
-## 2. Docker Usage
+- `workflow` is a ComfyUI API-format object.
+- `images` is optional; each entry supplies a workflow filename and base64 content.
+- Successful responses contain `output.images[]` and/or `output.videos[]`.
+- Each artifact includes `filename`, `type`, `data`, and `media_type`.
+- The handler polls ComfyUI `/history/{prompt_id}` until completion.
+- The old `prompt` + `image_url` input remains compatibility-only.
 
-- **Container-Centric:** Development, testing, and deployment are heavily reliant on Docker.
-- **Platform:** When building Docker images intended for RunPod, **always** use the `--platform linux/amd64` flag to ensure compatibility.
-  ```bash
-  # Example build command
-  docker build --platform linux/amd64 -t my-image:tag .
-  ```
-- **Development Builds:** For faster development iterations, build the clean base target and keep model/state downloads on the persistent workspace:
-  ```bash
-  docker build --target base --platform linux/amd64 -t ltx25-worker:dev .
-  ```
-- **Customization:** Follow the methods in the `README.md` for adding custom models/nodes (Network Volume or Dockerfile edits + snapshots).
+See [Configuration](configuration.md) for environment variables and [Deployment](deployment.md) for the GPU smoke-test gate.
 
-## 3. API Interaction
+## Model directory detection
 
-- **Primary Input Structure:** API calls to the `/run` or `/runsync` endpoints should use the workflow contract documented in the `README.md`. The primary key is `input`, containing `workflow` (mandatory object) and `images` (optional array).
-- **Image Encoding:** Input images provided in the `input.images` array must be base64 encoded strings (optionally including a `data:[<mediatype>];base64,` prefix).
-- **Workflow Format:** The `input.workflow` object should contain the JSON exported from ComfyUI using the "Save (API Format)" option (requires enabling "Dev mode Options" in ComfyUI settings).
-- **Output Structure:** Successful workflow responses can contain `output.images` and `output.videos`. Each entry includes `filename`, `type` (`"url"` or `"base64"`), `data`, and `media_type`.
-- **Legacy Compatibility:** The handler still accepts the older `input.prompt` + `input.image_url` request shape, but that is compatibility ballast. Do not build new integrations around it.
-- **Internal Communication:** The current handler polls ComfyUI `/history/{prompt_id}` over HTTP until outputs are ready.
+Loader node types determine where referenced files belong:
 
-## 4. Error Handling
+- `UpscaleModelLoader` -> `upscale_models`
+- `VAELoader` -> `vae`
+- `UNETLoader`, `UnetLoaderGGUF`, `Hy3DModelLoader` -> `diffusion_models`
+- `DualCLIPLoader`, `TripleCLIPLoader` -> `text_encoders`
+- `LoraLoader` -> `loras`
 
-- **User-Friendly Errors:** Always surface meaningful error messages to users rather than generic HTTP errors or internal exceptions.
-- **ComfyUI Integration:** When ComfyUI returns validation errors, parse the response body to extract detailed error information and present it in a structured, actionable format.
-- **Helpful Context:** When possible, provide users with information about available options (e.g., available models, valid parameters) to help them correct their requests.
-- **Graceful Fallbacks:** Error handling should degrade gracefully - if detailed error parsing fails, fall back to showing the raw response rather than hiding the error entirely.
+Keep workflow filenames identical to the files on the volume. Friendly guesses are not a model resolver.
 
-## 5. Development Workflow
+## Tests and dependencies
 
-- **Code Changes:** After modifying handler code, always rebuild the Docker image before testing with `docker-compose`:
-  ```bash
-  docker-compose down
-  docker build --target base -t ltx25-worker:dev .
-  docker-compose up -d
-  ```
-- **Debugging:** Use strategic logging/print statements to understand external API responses (like ComfyUI's error formats) before implementing error handling.
-- **Testing:** Test error scenarios as thoroughly as success scenarios to ensure good user experience.
+Run the focused commands in [Development](development.md#tests). The current CI does not run the entire legacy test suite.
 
-## 6. Testing
-
-- **Unit Tests:** Automated tests are located in the `tests/` directory and should be run using `python -m unittest discover`. Add new tests for new functionality or bug fixes.
-- **Local Environment:** Use `docker-compose up` for local end-to-end testing. This requires a correctly configured Docker environment with NVIDIA GPU support.
-
-## 7. Dependencies
-
-- **Python:** Manage Python dependencies using `pip` (or `uv`) and the `requirements.txt` file. Keep this file up-to-date.
-
-## 8. Code Style (General Guidance)
-
-- While not enforced by tooling, aim for code clarity and consistency. Follow general Python best practices (e.g., PEP 8).
-- Use meaningful variable and function names.
-- Add comments where the logic is non-obvious.
-
-### **Model Type Detection**
-
-Models are categorized based on node types using these mappings:
-
-- `UpscaleModelLoader` → `upscale_models`
-- `VAELoader` → `vae`
-- `UNETLoader`, `UnetLoaderGGUF`, `Hy3DModelLoader` → `diffusion_models`
-- `DualCLIPLoader`, `TripleCLIPLoader` → `text_encoders`
-- `LoraLoader` → `loras`
-- And additional specialized loaders for proper model categorization
-
-## Custom Node Dependencies
-
-When extending the base image with custom nodes, some nodes may require specific dependency versions to function correctly.
-
-### **Known Compatibility Issues**
-
-- **ComfyUI-BrushNet dependency issue:** Requires specific dependency versions: `diffusers>=0.29.0`, `accelerate>=0.29.0,<0.32.0`, and `peft>=0.7.0` to resolve import errors
-- **Pattern for fixing:** When encountering import errors from custom nodes, check the dependency chain and ensure compatible versions are installed in the Dockerfile using `uv pip install`
+Python dependencies are pinned in `requirements.txt` and installed with `pip` during the image build. Custom nodes share that environment, so dependency overrides must be explicit, pinned, and GPU-tested. Follow PEP 8; no formatter or linter is currently enforced.

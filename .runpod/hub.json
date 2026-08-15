@@ -52,27 +52,17 @@
         }
       },
       {
-        "key": "COMFY_ORG_API_KEY",
+        "key": "AWS_BUCKET_NAME",
         "input": {
-          "name": "Comfy.org API Key",
+          "name": "S3 Bucket Name",
           "type": "string",
-          "description": "Enter your Comfy.org API key to use API Nodes",
-          "default": "",
-          "advanced": false
-        }
-      },
-      {
-        "key": "BUCKET_ENDPOINT_URL",
-        "input": {
-          "name": "S3 Bucket Endpoint URL",
-          "type": "string",
-          "description": "Upload images to S3 (e.g. https://<bucket>.s3.<region>.amazonaws.com)",
+          "description": "Optional AWS S3 bucket for generated artifacts",
           "default": "",
           "advanced": true
         }
       },
       {
-        "key": "BUCKET_ACCESS_KEY_ID",
+        "key": "AWS_ACCESS_KEY_ID",
         "input": {
           "name": "S3 Access Key ID",
           "type": "string",
@@ -82,7 +72,7 @@
         }
       },
       {
-        "key": "BUCKET_SECRET_ACCESS_KEY",
+        "key": "AWS_SECRET_ACCESS_KEY",
         "input": {
           "name": "S3 Secret Access Key",
           "type": "string",
@@ -92,12 +82,12 @@
         }
       },
       {
-        "key": "SERVE_API_LOCALLY",
+        "key": "AWS_DEFAULT_REGION",
         "input": {
-          "name": "Serve API Locally (dev)",
-          "type": "boolean",
-          "description": "Dev only: run a local test API",
-          "default": false,
+          "name": "S3 Region",
+          "type": "string",
+          "description": "AWS region for optional S3 artifact uploads",
+          "default": "us-east-1",
           "advanced": true
         }
       },
@@ -112,43 +102,13 @@
         }
       },
       {
-        "key": "WEBSOCKET_RECONNECT_ATTEMPTS",
+        "key": "RUN_MODE",
         "input": {
-          "name": "Websocket Reconnect Attempts",
-          "type": "number",
-          "description": "How many times to retry if the connection drops",
-          "default": 5,
-          "advanced": true
-        }
-      },
-      {
-        "key": "WEBSOCKET_RECONNECT_DELAY_S",
-        "input": {
-          "name": "Websocket Reconnect Delay (s)",
-          "type": "number",
-          "description": "Seconds to wait between reconnect attempts",
-          "default": 3,
-          "advanced": true
-        }
-      },
-      {
-        "key": "WEBSOCKET_TRACE",
-        "input": {
-          "name": "Websocket Trace",
-          "type": "boolean",
-          "description": "Detailed connection logs (debug only)",
-          "default": false,
-          "advanced": true
-        }
-      },
-      {
-        "key": "REFRESH_WORKER",
-        "input": {
-          "name": "Refresh Worker",
-          "type": "boolean",
-          "description": "Restart the worker after each job for a clean state",
-          "default": false,
-          "advanced": true
+          "name": "Runtime Mode",
+          "type": "string",
+          "description": "Use worker for RunPod Serverless",
+          "default": "worker",
+          "advanced": false
         }
       }
     ]

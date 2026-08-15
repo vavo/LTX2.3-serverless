@@ -22,20 +22,20 @@ Use the hub metadata in `.runpod/hub.json` when publishing this template to RunP
 - Attach a network volume. Without it, cold starts will repeatedly redownload large model assets like the machine has a concussion.
 - Keep `PERSIST_WORKSPACE=true`.
 - Use at least 48 GB VRAM for the distilled INT8 profile.
-- Plan for roughly 100 GB or more of disk if you want a comfortable setup with cached assets and optional upscalers.
+- Plan for roughly 100 GB or more of disk if you want a comfortable setup with cached assets and the latent upscaler.
 
 ## Important environment variables
 
 - `LTX25_PRELOAD_VARIANT`: `distilled-int8`
 - `LTX25_PRELOAD_PROMPT_ENHANCER`: preload the Gemma prompt enhancer
 - `HUGGINGFACE_ACCESS_TOKEN`: token with accepted access to the gated LTX 2.5 repository
-- `COMFY_ORG_API_KEY`: optional key for Comfy.org API nodes
+- `RUN_MODE`: use `worker` for a serverless endpoint
 
 ## Usage
 
-1. Export your ComfyUI workflow with `Workflow > Export (API)`.
+1. Export your ComfyUI workflow in API format, or use the checked-in LTX 2.5 I2V workflow.
 2. Send it to the RunPod `/run` or `/runsync` endpoint.
-3. If your workflow references additional LTX assets not preloaded at boot, the LTX nodes can fetch them into the persistent workspace on first use.
+3. Put any additional workflow assets under the matching `/workspace/models/<type>` directory before running the workflow.
 
 The full API payload format and deployment notes live in the main project docs:
 

@@ -1,177 +1,68 @@
-# Network Volumes & Model Paths
+# Network volumes and model paths
 
-This document explains how to use RunPod **Network Volumes** with this worker, how model paths are resolved inside the container, which worker state is persisted on the volume, and how to debug cases where models are not detected.
+Model weights are deliberately excluded from Docker layers. Use a RunPod network volume so workers do not redownload the LTX stack after every scale-to-zero cycle.
 
-> **Scope**
->
-> These instructions apply to **serverless endpoints** using this worker. Pods mount network volumes at `/workspace` by default. Serverless workers see the volume at `/runpod-volume`, and this worker creates a `/workspace` alias to that path so the runtime can use one internal root.
+## Mount mapping
 
-## Directory Mapping
+RunPod mounts a Serverless network volume at `/runpod-volume`. This worker aliases it to `/workspace`, giving Serverless and Pod modes the same internal layout.
 
-For **serverless endpoints**:
-
-- Network volume root is mounted at: `/runpod-volume`
-- Worker-internal persistent root is normalized to: `/workspace`
-- ComfyUI models are therefore resolved from: `/workspace/models/...`
-- This is the same storage as: `/runpod-volume/models/...`
-
-For **Pods**:
-
-- Network volume root is mounted at: `/workspace`
-- Equivalent ComfyUI model path: `/workspace/models/...`
-
-This worker also persists its runtime state under:
-
-- `/workspace/worker-comfyui/comfyui`
-- `/workspace/worker-comfyui/venv`
-- `/workspace/worker-comfyui/cache`
-- `/workspace/worker-comfyui/.bootstrap.lock`
-
-That means ComfyUI itself, the Python environment, and model-download caches can survive worker restarts when a network volume is attached.
-The bootstrap lock is there specifically to stop multiple workers from trying to seed the same shared persisted venv at the same time.
-
-## Path Cheat Sheet
-
-With persistence enabled, the current runtime uses these paths:
-
-| Purpose | Path |
-| ------- | ---- |
+| Purpose | Worker path |
+| --- | --- |
 | Persistent root | `/workspace` |
-| Serverless mount backing that root | `/runpod-volume` |
-| Persisted ComfyUI root | `/workspace/worker-comfyui/comfyui` |
-| Persisted Python venv | `/workspace/worker-comfyui/venv` |
-| Persisted caches | `/workspace/worker-comfyui/cache` |
-| Shared bootstrap lock | `/workspace/worker-comfyui/.bootstrap.lock` |
-| Shared model root | `/workspace/models` |
-| Generated extra model paths file | `/comfyui/extra_model_paths.yaml` |
-| Current handler input staging | `/comfyui/input` |
-| Current handler output pickup | `/comfyui/output` |
-| ComfyUI Manager config | `/comfyui/user/__manager/config.ini` |
+| Serverless backing mount | `/runpod-volume` |
+| Models | `/workspace/models` |
+| ComfyUI state | `/workspace/worker-comfyui/comfyui` |
+| Python virtualenv | `/workspace/worker-comfyui/venv` |
+| Caches | `/workspace/worker-comfyui/cache` |
+| Bootstrap lock | `/workspace/worker-comfyui/.bootstrap.lock` |
 
-The input and output paths above reflect the current handler implementation. The persisted ComfyUI root still lives under `/workspace/worker-comfyui/comfyui`, and `/comfyui` points at that persisted root after bootstrap.
+RunPod network volumes persist independently of workers, but bind an endpoint to the volume's data center. Multiple volumes can improve geographic GPU availability, though RunPod does not synchronize their contents.
 
-If you use the S3-compatible API, the same paths map as:
+## LTX 2.5 layout
 
-- Serverless: `/runpod-volume/my-folder/file.txt`
-- Pod: `/workspace/my-folder/file.txt`
-- S3 API: `s3://<NETWORK_VOLUME_ID>/my-folder/file.txt`
-
-## Expected Directory Structure
-
-Models must be placed in the following structure on your network volume:
+The default `distilled-int8` preload creates this structure:
 
 ```text
-/workspace/
-└── models/
-    ├── checkpoints/      # Stable Diffusion checkpoints (.safetensors, .ckpt)
-    ├── loras/            # LoRA files (.safetensors, .pt)
-    ├── vae/              # VAE models (.safetensors, .pt)
-    ├── clip/             # CLIP models (.safetensors, .pt)
-    ├── clip_vision/      # CLIP Vision models
-    ├── controlnet/       # ControlNet models (.safetensors, .pt)
-    ├── embeddings/       # Textual inversion embeddings (.safetensors, .pt)
-    ├── upscale_models/   # Upscaling models (.safetensors, .pt)
-    ├── unet/             # UNet models
-    └── configs/          # Model configs (.yaml, .json)
+/workspace/models/
+├── diffusion_models/
+│   └── ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors
+├── text_encoders/
+│   ├── gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors
+│   └── gemma4_e2b_it_bf16.safetensors
+├── vae/
+│   ├── ltx-2.5-video-vae-bf16.safetensors
+│   └── ltx-2.5-audio-vae-bf16.safetensors
+└── latent_upscale_models/
+    └── ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
 ```
 
-> **Note**
->
-> Only create the subdirectories you actually need; empty or missing folders are fine. On serverless, `/workspace/models/...` and `/runpod-volume/models/...` are the same underlying storage.
+The prompt-enhancer file is omitted when `LTX25_PRELOAD_PROMPT_ENHANCER=false`.
 
-## Supported File Extensions
-
-ComfyUI only recognizes files with specific extensions when scanning model directories.
-
-| Model Type     | Supported Extensions                        |
-| -------------- | ------------------------------------------- |
-| Checkpoints    | `.safetensors`, `.ckpt`, `.pt`, `.pth`, `.bin` |
-| LoRAs          | `.safetensors`, `.pt`                       |
-| VAE            | `.safetensors`, `.pt`, `.bin`               |
-| CLIP           | `.safetensors`, `.pt`, `.bin`               |
-| ControlNet     | `.safetensors`, `.pt`, `.pth`, `.bin`       |
-| Embeddings     | `.safetensors`, `.pt`, `.bin`               |
-| Upscale Models | `.safetensors`, `.pt`, `.pth`               |
-
-Files with other extensions (for example `.txt`, `.zip`) are **ignored** by ComfyUI’s model discovery.
-
-## Common Issues
-
-- **Wrong root directory**
-  - Models placed directly under `/runpod-volume/checkpoints/...` instead of `/runpod-volume/models/checkpoints/...`.
-- **Incorrect extensions**
-  - Files named without one of the supported extensions are skipped.
-- **Empty directories**
-  - No actual model files present in `models/checkpoints` (or other folders).
-- **Volume not attached**
-  - Endpoint created without selecting a network volume under **Advanced → Select Network Volume**.
-
-If any of the above is true, ComfyUI will silently fail to discover models from the network volume.
-
-## Debugging with `NETWORK_VOLUME_DEBUG`
-
-The worker exposes an opt‑in debug mode controlled via the `NETWORK_VOLUME_DEBUG` environment variable.
-
-### When to Use
-
-Enable this when:
-
-- Models on your network volume are not appearing in ComfyUI
-- You suspect the directory structure or file extensions are wrong
-- You want to quickly verify what the worker can actually see on `/runpod-volume`
-
-### How to Enable
-
-1. Go to your serverless **Endpoint → Manage → Edit**.
-2. Under **Environment Variables**, add:
-
-   - `NETWORK_VOLUME_DEBUG=true`
-
-3. Save and wait for workers to restart (or scale to zero and back up).
-4. Send any request to your endpoint (even a minimal one) to trigger the diagnostics.
-
-### Reading the Diagnostics
-
-When enabled, each request prints a detailed report to the worker logs, for example:
+The generated `/comfyui/extra_model_paths.yaml` also maps these optional model directories under `/workspace/models`:
 
 ```text
-======================================================================
-NETWORK VOLUME DIAGNOSTICS (NETWORK_VOLUME_DEBUG=true)
-======================================================================
-
-[1] Checking extra_model_paths.yaml configuration...
-    ✓ FOUND: /comfyui/extra_model_paths.yaml
-
-[2] Checking network volume mount at /runpod-volume...
-    ✓ MOUNTED: /runpod-volume
-
-[3] Checking directory structure...
-    ✓ FOUND: /runpod-volume/models
-
-[4] Scanning model directories...
-
-    checkpoints/:
-      - my-model.safetensors (6.5 GB)
-
-    loras/:
-      - style-lora.safetensors (144.2 MB)
-
-[5] Summary
-    ✓ Models found on network volume!
-======================================================================
+checkpoints  clip  clip_vision  configs  controlnet  embeddings
+loras  unet  upscale_models
 ```
 
-If there is a problem, the diagnostics will instead highlight it, for example:
+Only create directories used by your workflows. The loader node determines the directory: `UNETLoader` uses `diffusion_models`, `DualCLIPLoader` uses `text_encoders`, `VAELoader` uses `vae`, and `LoraLoader` uses `loras`.
 
-- Missing `models/` directory
-- No valid model files in any subdirectory
-- Files present but ignored due to wrong extensions
+## Attach and preload
 
-### Disabling Debug Mode
+1. Create a volume in a data center offering the target GPU.
+2. Attach it under the endpoint's advanced network-volume settings.
+3. Set the preload variables from the [configuration guide](configuration.md#ltx-25-preload).
+4. Start one worker and let bootstrap finish before scaling concurrency.
+5. Confirm all expected files exist under `/workspace/models` in the worker logs or shell.
 
-Once you have resolved your issue, disable diagnostics to keep logs clean:
+The bootstrap lock prevents two workers from seeding the persisted ComfyUI and venv concurrently. Model downloads use partial files and atomic renames, but the calmest first boot is still one worker. Distributed filesystems reward modesty.
 
-- Remove the `NETWORK_VOLUME_DEBUG` environment variable, **or**
-- Set `NETWORK_VOLUME_DEBUG=false`
+## Troubleshooting
 
-This returns the worker to normal behavior without extra log noise.
+- **Models are missing:** verify the volume is attached and files are below `/runpod-volume/models`, not `/runpod-volume` directly.
+- **Access denied:** accept the model license and provide a valid read token.
+- **A workflow reports an unknown model:** compare its loader widget value with the exact filename and directory above.
+- **Every cold start downloads again:** confirm `PERSIST_WORKSPACE=true` and that `/workspace` resolves to the attached volume.
+- **A second region fails:** populate every attached volume; RunPod does not mirror them automatically.
+
+See RunPod's [network volume documentation](https://docs.runpod.io/storage/network-volumes) for current attachment and multi-volume behavior.

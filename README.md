@@ -2,10 +2,6 @@
 
 Blackwell-first LTX 2.5 inference on ComfyUI and RunPod, with persistent models, caches, ComfyUI, and Python environment under `/workspace`.
 
-<p align="center">
-  <img src="assets/worker_sitting_in_comfy_chair.jpg" title="Worker sitting in comfy chair" />
-</p>
-
 ## Stack
 
 - CUDA 13.0.2 primary; CUDA 12.8.1 secondary
@@ -18,7 +14,14 @@ Blackwell-first LTX 2.5 inference on ComfyUI and RunPod, with persistent models,
 ## Quickstart
 
 1. Accept the model terms on [Lightricks/LTX-2.5](https://huggingface.co/Lightricks/LTX-2.5).
-2. Build and publish `ltx2-5-distilled-int8` from [`docker-bake.hcl`](./docker-bake.hcl).
+2. Build and publish the `ltx2-5-distilled-int8` target from [`docker-bake.hcl`](./docker-bake.hcl):
+
+```bash
+docker buildx bake ltx2-5-distilled-int8 \
+  --set 'ltx2-5-distilled-int8.tags=<registry>/<image>:<version>-ltx2.5-distilled-int8-cu130' \
+  --push
+```
+
 3. Create a RunPod serverless template using that image and attach a network volume.
 4. Set:
 
@@ -30,7 +33,7 @@ LTX25_PRELOAD_PROMPT_ENHANCER=true
 HUGGINGFACE_ACCESS_TOKEN=hf_xxx
 ```
 
-5. Send the checked-in [LTX 2.5 I2V API workflow](./video_ltx2_5_i2v_API.json) to `/run` or `/runsync`.
+5. Send the checked-in [LTX 2.5 I2V API workflow](./video_ltx2_5_i2v_API.json) to `/run` or `/runsync` using the [workflow request contract](#api-contract).
 
 The model bootstrap downloads weights to the persistent model root. Model weights are never baked into Docker layers.
 
@@ -43,10 +46,10 @@ The model bootstrap downloads weights to the persistent model root. Model weight
 | `ltx2-5-distilled-int8` | 13.0.2 | Distilled INT8 ConvRot, recommended |
 | `ltx2-5-distilled-int8-cu128` | 12.8.1 | Distilled INT8 ConvRot fallback |
 
-All targets build for `linux/amd64`. Example:
+All bake targets build for `linux/amd64`. For a direct Docker build, keep the platform explicit:
 
 ```bash
-docker buildx bake ltx2-5-distilled-int8
+docker build --platform linux/amd64 --target base -t ltx25-worker:dev .
 ```
 
 Image tags follow `<version>-ltx2.5-distilled-int8-cu130` and `<version>-ltx2.5-distilled-int8-cu128`.
@@ -61,7 +64,7 @@ The frontend is served on port `7777`; ComfyUI uses `8188`.
 
 ## API contract
 
-The preferred request shape is:
+The preferred request shape is below. `workflow` must be an API-format ComfyUI workflow; `{}` is only a structural placeholder.
 
 ```json
 {
@@ -90,7 +93,11 @@ The default INT8 workflow preloads:
 - `models/vae/ltx-2.5-audio-vae-bf16.safetensors`
 - `models/latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors`
 
-Use at least 48 GB VRAM and attach at least 100 GB of persistent storage.
+Start with at least 48 GB VRAM for the distilled INT8 profile and validate the exact workflow before production. Attach at least 100 GB of persistent storage for the default stack and caches.
+
+## Validation boundary
+
+The test workflow validates shell scripts, JSON, Python syntax, workflow transformation, payload handling, and Docker bake definitions. A release is not GPU-validated until the image has been built for `linux/amd64`, booted on the target CUDA/GPU class, and completed the checked-in workflow.
 
 ## Documentation
 
