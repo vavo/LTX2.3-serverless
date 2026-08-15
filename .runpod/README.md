@@ -40,6 +40,6 @@ Use the hub metadata in `.runpod/hub.json` when publishing this template to RunP
 
 The full API payload format and deployment notes live in the main project docs:
 
-- [Repository README](https://github.com/vavo/LTX2.3-serverless/blob/main/README.md)
-- [Deployment Guide](https://github.com/vavo/LTX2.3-serverless/blob/main/docs/deployment.md)
-- [Network Volume Notes](https://github.com/vavo/LTX2.3-serverless/blob/main/docs/network-volumes.md)
+- [Repository README](https://github.com/vavo/LTX2.5-serverless/blob/main/README.md)
+- [Deployment Guide](https://github.com/vavo/LTX2.5-serverless/blob/main/docs/deployment.md)
+- [Network Volume Notes](https://github.com/vavo/LTX2.5-serverless/blob/main/docs/network-volumes.md)

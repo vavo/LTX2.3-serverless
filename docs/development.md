@@ -19,11 +19,9 @@ corepack enable
 pnpm install --frozen-lockfile
 ```
 
-The repository URL still uses its historical name:
-
 ```bash
-git clone https://github.com/vavo/LTX2.3-serverless.git
-cd LTX2.3-serverless
+git clone https://github.com/vavo/LTX2.5-serverless.git
+cd LTX2.5-serverless
 ```
 
 ## Tests
