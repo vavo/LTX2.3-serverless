@@ -9,7 +9,7 @@ Blackwell-first LTX 2.5 inference on ComfyUI and RunPod, with persistent models,
 - PyTorch 2.11.0, torchvision 0.26.0, torchaudio 2.11.0
 - ComfyUI v0.33.1 with built-in Manager 4.2.2
 - Comfy CLI 1.16.0 and Hugging Face Hub CLI 1.27.0
-- Official LTX 2.5 nodes and local image-to-video workflow
+- Official LTX 2.5 nodes plus separate API and editor image-to-video workflows
 - Distilled INT8 ConvRot for Blackwell-efficient inference
 
 ## Quickstart

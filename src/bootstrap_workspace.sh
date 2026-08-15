@@ -288,6 +288,16 @@ sync_named_files_from_image() {
     done
 }
 
+remove_legacy_api_workflow() {
+    local workflow_target_dir="$1"
+    local legacy_workflow="${workflow_target_dir}/video_ltx2_5_i2v_API.json"
+
+    if [ -f "${legacy_workflow}" ]; then
+        bootstrap_log "Removing legacy API-format workflow from ComfyUI user library"
+        rm -f "${legacy_workflow}"
+    fi
+}
+
 write_extra_model_paths() {
     local base_path="$1"
     local output_file="${2:-/comfyui/extra_model_paths.yaml}"
@@ -335,6 +345,12 @@ bootstrap_workspace() {
         bootstrap_log "No persistent workspace mount detected; using image-local paths"
         export PATH="${venv_runtime_root}/bin:${PATH}"
         export COMFY_MODEL_ROOT="${COMFY_MODEL_ROOT:-${comfy_runtime_root}/models}"
+        workflow_target_dir="${comfy_runtime_root}/${workflow_target_dir_rel}"
+        remove_legacy_api_workflow "${workflow_target_dir}"
+        sync_named_files_from_image \
+            "${workflow_template_source_root}" \
+            "${workflow_target_dir}" \
+            "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_5_i2v.json}"
         write_extra_model_paths "${comfy_runtime_root}" "${extra_model_paths_file}"
         return
     fi
@@ -365,16 +381,18 @@ bootstrap_workspace() {
     sync_custom_nodes_from_image \
         "${comfy_image_root}/custom_nodes" \
         "${comfy_root}/custom_nodes"
+    remove_legacy_api_workflow "${workflow_target_dir}"
     sync_named_files_from_image \
         "${workflow_template_source_root}" \
         "${workflow_target_dir}" \
-        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_5_i2v_API.json}"
+        "${COMFY_BOOTSTRAP_WORKFLOWS:-video_ltx2_5_i2v.json}"
 
     trap - RETURN
     release_bootstrap_lock "${bootstrap_lock_dir}"
 
     replace_with_symlink "${comfy_runtime_root}" "${comfy_root}"
     replace_with_symlink "${venv_runtime_root}" "${venv_root}"
+    replace_with_symlink "${comfy_runtime_root}/models" "${WORKSPACE_ROOT}/models"
 
     export PATH="${venv_runtime_root}/bin:${PATH}"
     export HF_HOME="${cache_root}/huggingface"

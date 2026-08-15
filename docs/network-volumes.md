@@ -47,6 +47,8 @@ loras  unet  upscale_models
 
 Only create directories used by your workflows. The loader node determines the directory: `UNETLoader` uses `diffusion_models`, `DualCLIPLoader` uses `text_encoders`, `VAELoader` uses `vae`, and `LoraLoader` uses `loras`.
 
+At startup, `/comfyui/models` is linked directly to `/workspace/models`. After ComfyUI starts, the container verifies the required LTX files through `/models/diffusion_models`, `/models/text_encoders`, `/models/vae`, and `/models/latent_upscale_models`; startup fails if files exist on disk but are absent from ComfyUI's index.
+
 ## Attach and preload
 
 1. Create a volume in a data center offering the target GPU.

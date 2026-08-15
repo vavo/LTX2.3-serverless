@@ -192,6 +192,29 @@ start_frontend() {
     echo "${FRONTEND_PID}" > "$FRONTEND_PID_FILE"
 }
 
+verify_comfy_model_discovery() {
+    if [ "${LTX25_MODEL_DISCOVERY_CHECK:-true}" != "true" ]; then
+        echo "worker-comfyui: ComfyUI model discovery check disabled"
+        return
+    fi
+
+    if [ -z "${LTX25_PRELOAD_VARIANT:-}" ]; then
+        echo "worker-comfyui: No LTX preload profile; skipping model discovery check"
+        return
+    fi
+
+    local verify_args=(
+        --server "${COMFY_MODEL_DISCOVERY_URL:-http://127.0.0.1:8188}"
+        --timeout "${COMFY_MODEL_DISCOVERY_TIMEOUT_SECONDS:-120}"
+    )
+    if [ "${LTX25_PRELOAD_PROMPT_ENHANCER:-true}" = "true" ]; then
+        verify_args+=(--require-prompt-enhancer)
+    fi
+
+    echo "worker-comfyui: Verifying models through the live ComfyUI API"
+    python /verify_comfy_models.py "${verify_args[@]}"
+}
+
 wait_for_pod_services() {
     local pids=()
     if [ -n "${COMFY_PID}" ]; then
@@ -213,6 +236,7 @@ wait_for_pod_services() {
 case "${RUN_MODE}" in
     local-api)
         start_comfyui true
+        verify_comfy_model_discovery
         start_frontend
 
         echo "worker-comfyui: Starting RunPod Handler in local API mode"
@@ -220,11 +244,13 @@ case "${RUN_MODE}" in
         ;;
     pod)
         start_comfyui true
+        verify_comfy_model_discovery
         start_frontend
         wait_for_pod_services
         ;;
     worker)
         start_comfyui false
+        verify_comfy_model_discovery
         start_frontend
 
         echo "worker-comfyui: Starting RunPod Handler in worker mode"

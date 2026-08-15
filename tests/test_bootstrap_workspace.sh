@@ -24,7 +24,8 @@ EXTRA_MODEL_PATHS_FILE="${TEST_DIR}/extra_model_paths.yaml"
 mkdir -p "${IMAGE_COMFY}/models/checkpoints" "${IMAGE_VENV}/bin" "${IMAGE_APP}" "${RUNTIME_COMFY}" "${RUNTIME_VENV}"
 printf 'seeded comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'seeded venv\n' > "${IMAGE_VENV}/bin/python"
-printf '{\"workflow\":\"seeded\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v_API.json"
+printf '{\"nodes\":[],\"workflow\":\"seeded editor\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v.json"
+printf '{\"workflow\":\"api only\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v_API.json"
 mkdir -p "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader"
 printf 'downloader present\n' > "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader/README.txt"
 
@@ -66,7 +67,16 @@ assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded 
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 assert_file_contains "${EXTRA_MODEL_PATHS_FILE}" "base_path: ${WORKSPACE_ROOT}"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader present"
-assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json" "\"workflow\":\"seeded\""
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v.json" "\"workflow\":\"seeded editor\""
+[ ! -e "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json" ] || {
+    echo "API workflow must not be installed in the ComfyUI user library"
+    exit 1
+}
+[ -L "${RUNTIME_COMFY}/models" ] || { echo "Expected ${RUNTIME_COMFY}/models to be a symlink"; exit 1; }
+[ "$(readlink "${RUNTIME_COMFY}/models")" = "${WORKSPACE_ROOT}/models" ] || {
+    echo "Unexpected ComfyUI model symlink target"
+    exit 1
+}
 
 for cache_dir in huggingface pip torch triton xdg; do
     [ -d "${WORKSPACE_ROOT}/worker-comfyui/cache/${cache_dir}" ] || {
@@ -78,14 +88,19 @@ done
 printf 'mutated comfy\n' > "${IMAGE_COMFY}/main.py"
 printf 'mutated venv\n' > "${IMAGE_VENV}/bin/python"
 printf 'downloader updated\n' > "${IMAGE_COMFY}/custom_nodes/ComfyUI-Downloader/README.txt"
-printf '{\"workflow\":\"updated\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v_API.json"
+printf '{\"nodes\":[],\"workflow\":\"updated editor\"}\n' > "${IMAGE_APP}/video_ltx2_5_i2v.json"
+printf '{\"workflow\":\"legacy api\"}\n' > "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json"
 
 run_persistent_bootstrap
 
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/main.py" "seeded comfy"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/venv/bin/python" "seeded venv"
 assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader/README.txt" "downloader updated"
-assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json" "\"workflow\":\"updated\""
+assert_file_contains "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v.json" "\"workflow\":\"updated editor\""
+[ ! -e "${WORKSPACE_ROOT}/worker-comfyui/comfyui/user/default/workflows/video_ltx2_5_i2v_API.json" ] || {
+    echo "Expected legacy API workflow to be removed from user library"
+    exit 1
+}
 
 rm -rf "${WORKSPACE_ROOT}/worker-comfyui/comfyui/custom_nodes/ComfyUI-Downloader"
 run_persistent_bootstrap
@@ -109,6 +124,7 @@ mkdir -p "${LOCAL_RUNTIME_COMFY}/models"
     export PERSIST_WORKSPACE=true
     export COMFY_RUNTIME_ROOT="${LOCAL_RUNTIME_COMFY}"
     export EXTRA_MODEL_PATHS_FILE="${LOCAL_EXTRA_MODEL_PATHS_FILE}"
+    export WORKFLOW_TEMPLATE_SOURCE_ROOT="${IMAGE_APP}"
 
     source "${SCRIPT_TO_TEST}"
     detect_persistent_root() {
@@ -123,6 +139,7 @@ mkdir -p "${LOCAL_RUNTIME_COMFY}/models"
 )
 
 assert_file_contains "${LOCAL_EXTRA_MODEL_PATHS_FILE}" "base_path: ${LOCAL_RUNTIME_COMFY}"
+assert_file_contains "${LOCAL_RUNTIME_COMFY}/user/default/workflows/video_ltx2_5_i2v.json" "\"workflow\":\"updated editor\""
 
 LOCK_DIR="${WORKSPACE_ROOT}/worker-comfyui/.bootstrap.lock"
 mkdir -p "${WORKSPACE_ROOT}/worker-comfyui"

@@ -39,6 +39,7 @@ bash tests/test_bootstrap_ltx25.sh
 python3 -m unittest \
   tests.test_ltx_payload_builder \
   tests.test_ltx25_workflow \
+  tests.test_verify_comfy_models \
   tests.test_workflow_support \
   -v
 

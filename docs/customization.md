@@ -47,7 +47,7 @@ COPY input/reference.png /comfyui/input/reference.png
 
 ## Workflows
 
-To seed additional API workflows into persisted ComfyUI state:
+To seed additional editor-format workflows into persisted ComfyUI state:
 
 1. Copy the workflow JSON into the derived image.
 2. Set `COMFY_BOOTSTRAP_WORKFLOWS` to a comma-separated list of image paths.
@@ -55,11 +55,11 @@ To seed additional API workflows into persisted ComfyUI state:
 ```Dockerfile
 FROM <registry>/<image>:<version>-base
 
-COPY my_workflow_API.json /my_workflow_API.json
-ENV COMFY_BOOTSTRAP_WORKFLOWS="video_ltx2_5_i2v_API.json,my_workflow_API.json"
+COPY my_workflow.json /my_workflow.json
+ENV COMFY_BOOTSTRAP_WORKFLOWS="video_ltx2_5_i2v.json,my_workflow.json"
 ```
 
-The handler can also accept an API-format workflow directly in each request, so image seeding is only useful for workflows operators want visible in the persisted ComfyUI user directory.
+The handler accepts API-format workflows directly in each request. Do not seed those files into the UI library; ComfyUI's canvas requires editor/save-format JSON with top-level `nodes` and `links`.
 
 ## Dependency conflicts
 
