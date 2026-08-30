@@ -1,5 +1,9 @@
 # LTX2.3 Serverless Worker
 
+> [!IMPORTANT]
+> This repository is no longer maintained and will not receive further updates.
+> It has been replaced by [LTX2.5 Serverless](https://github.com/vavo/LTX2.5-serverless).
+
 Serverless LTX 2.3, minus the goldfish-memory cold start.
 
 This repo turns ComfyUI + LTX 2.3 into a RunPod serverless template that keeps its brain on `/workspace`: Comfy install, Python venv, caches, and downloaded model assets survive worker churn instead of being painfully rediscovered on every boot.
