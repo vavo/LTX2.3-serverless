@@ -1,3 +1,7 @@
+## Repository status
+
+This repository is no longer maintained and will not receive further updates. It has been replaced by [LTX2.5 Serverless](https://github.com/vavo/LTX2.5-serverless).
+
 # [5.3.0](https://github.com/runpod-workers/worker-comfyui/compare/5.2.0...5.3.0) (2025-07-22)
 
 ## 5.8.5
